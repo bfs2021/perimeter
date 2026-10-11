@@ -1,7 +1,9 @@
 <nav>
   <div>
     <a href="/">Dashboard</a>
+    {{if .CanWrite}}
     <a href="/import">Import</a>
+    {{end}}
     {{if .IsAdmin}}
     <a href="/settings">Settings</a>
     {{end}}

@@ -15,7 +15,7 @@ func (Invite) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("email").NotEmpty(),
 		field.String("token_hash").Unique().NotEmpty(),
-		field.Enum("role").Values("admin", "member").Default("member"),
+		field.Enum("role").Values("admin", "member", "viewer").Default("member"),
 		field.Time("expires_at"),
 		field.Time("accepted_at").Optional().Nillable(),
 	}
