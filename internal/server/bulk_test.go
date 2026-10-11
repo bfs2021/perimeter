@@ -281,8 +281,8 @@ func TestBulkDeleteConfirmedDeletes(t *testing.T) {
 	form := idsForm(ids["a.example.com"], ids["b.example.com"])
 	form.Set("confirm", "1")
 	resp := postForm(t, srv, token, "/targets/bulk/delete", form)
-	if resp.StatusCode != http.StatusFound || resp.Header.Get("Location") != "/" {
-		t.Fatalf("status %d location %q, want 302 to /", resp.StatusCode, resp.Header.Get("Location"))
+	if resp.StatusCode != http.StatusSeeOther || resp.Header.Get("Location") != "/" {
+		t.Fatalf("status %d location %q, want 303 to /", resp.StatusCode, resp.Header.Get("Location"))
 	}
 
 	dash := send(t, srv, token, "GET", "/", "", "")

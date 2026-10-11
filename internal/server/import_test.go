@@ -120,7 +120,7 @@ func TestUpdateTargetTagsValidation(t *testing.T) {
 	form.Add("tags", strconv.Itoa(staging))
 	form.Add("tags", strconv.Itoa(staging))
 	resp = postForm(t, srv, token, path, form)
-	if resp.StatusCode != http.StatusFound || resp.Header.Get("Location") != "/targets/"+strconv.Itoa(tid) {
+	if resp.StatusCode != http.StatusSeeOther || resp.Header.Get("Location") != "/targets/"+strconv.Itoa(tid) {
 		t.Fatalf("valid ids: status %d, location %q", resp.StatusCode, resp.Header.Get("Location"))
 	}
 	if got := targetTagIDs(t, client, tid); !slices.Equal(got, []int{staging}) {
@@ -129,7 +129,7 @@ func TestUpdateTargetTagsValidation(t *testing.T) {
 
 	// No values clears all tags.
 	resp = postForm(t, srv, token, path, url.Values{})
-	if resp.StatusCode != http.StatusFound {
+	if resp.StatusCode != http.StatusSeeOther {
 		t.Fatalf("clear: status %d", resp.StatusCode)
 	}
 	if got := targetTagIDs(t, client, tid); len(got) != 0 {

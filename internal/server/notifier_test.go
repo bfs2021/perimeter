@@ -90,8 +90,8 @@ func TestCreateEmailNotifierWithSelectedEvents(t *testing.T) {
 		string(notifier.EventSSLGradeDrop),
 		string(notifier.EventCertExpiring),
 	))
-	if resp.StatusCode != http.StatusFound {
-		t.Fatalf("status %d, want 302; body:\n%s", resp.StatusCode, resp.Body)
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("status %d, want 303; body:\n%s", resp.StatusCode, resp.Body)
 	}
 
 	cfgs, err := client.NotifierConfig.Query().All(ctx)
@@ -123,8 +123,8 @@ func TestCreateWebhookNotifierAllEventsStoresNil(t *testing.T) {
 		`{"url":"https://example.com/hook"}`,
 		allEventValues()...,
 	))
-	if resp.StatusCode != http.StatusFound {
-		t.Fatalf("status %d, want 302; body:\n%s", resp.StatusCode, resp.Body)
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("status %d, want 303; body:\n%s", resp.StatusCode, resp.Body)
 	}
 
 	cfg, err := client.NotifierConfig.Query().Only(ctx)
@@ -172,7 +172,7 @@ func TestCreateNotifierRejectsBadInput(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			srv, client, token := notifierServer(t)
 
-			resp := postForm(t, srv, token, "/notifiers", tt.form)
+			resp := followRedirect(t, srv, token, postForm(t, srv, token, "/notifiers", tt.form))
 			if resp.StatusCode != http.StatusOK {
 				t.Fatalf("status %d, want 200 with the settings page; body:\n%s", resp.StatusCode, resp.Body)
 			}
