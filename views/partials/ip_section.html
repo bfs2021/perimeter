@@ -14,14 +14,14 @@
       </td>
       <td>
         {{if .ScanError}}
-        <span class="badge badge-gray">unreachable</span> <span class="text-muted">{{.ScanError}}</span>
+        <span class="badge badge-gray" title="{{.ScanError}}">scan failed</span> <span class="text-muted">{{.ScanError}}</span>
         {{else if .Edges.Ports}}
         {{range .Edges.Ports}}<span class="badge badge-red">{{.Number}}</span> {{end}}
         {{else}}
         <span class="badge badge-green">none</span>
         {{end}}
         {{if and (not .ScanError) (or .Added .Removed)}}
-        <div><small class="text-muted" title="+N: opened since the previous scan, &minus;N: closed since the previous scan">{{range .Added}}+{{.}} {{end}}{{range .Removed}}&minus;{{.}} {{end}}</small></div>
+        <div><small class="text-muted" title="+N: opened since the previous scan, &minus;N: closed since the previous scan">changes: {{range .Added}}+{{.}} {{end}}{{range .Removed}}&minus;{{.}} {{end}}</small></div>
         {{end}}
       </td>
     </tr>
@@ -30,7 +30,4 @@
     {{end}}
   </tbody>
 </table>
-{{if .Scans}}
-<p class="text-muted" style="margin-top: 4px;">+N opened / &minus;N closed since the previous scan</p>
-{{end}}
 {{template "views/partials/pagination" .Pagination}}
