@@ -19,15 +19,17 @@ func portScanWith(numbers ...int) *ent.PortScan {
 }
 
 // The target page is the only caller of the partial, and no handler test
-// reaches it, so render it directly: an error row must show the unreachable
-// badge and no diff, the normal row its ports.
+// reaches it, so render it directly: an error row must show the scan failed
+// badge (error in the title and visible text) and no diff, the normal row its
+// ports with the changes: prefix, and the old static legend must be gone.
 func TestIpSectionRendersScanError(t *testing.T) {
 	engine := newViewEngine(os.DirFS("../.."))
+	const errMsg = "host unreachable: no route to host"
 	data := ipScanRow{
 		IP: &ent.IP{},
 		Scans: []portScanView{
-			{PortScan: &ent.PortScan{CheckCount: 2, ScanError: "host unreachable: no route to host"}},
-			{PortScan: portScanWith(80)},
+			{PortScan: &ent.PortScan{CheckCount: 2, ScanError: errMsg}},
+			{PortScan: portScanWith(80), Added: []int{443}},
 		},
 		Pagination: pagination{Page: 1, TotalPages: 1},
 	}
@@ -37,11 +39,17 @@ func TestIpSectionRendersScanError(t *testing.T) {
 		t.Fatalf("render ip_section: %v", err)
 	}
 	out := buf.String()
-	if !strings.Contains(out, `<span class="badge badge-gray">unreachable</span>`) {
-		t.Errorf("missing unreachable badge:\n%s", out)
+	if !strings.Contains(out, `<span class="badge badge-gray" title="`+errMsg+`">scan failed</span>`) {
+		t.Errorf("missing scan failed badge:\n%s", out)
 	}
-	if !strings.Contains(out, "host unreachable: no route to host") {
+	if !strings.Contains(out, errMsg) {
 		t.Errorf("missing error text:\n%s", out)
+	}
+	if strings.Contains(out, "+N opened") {
+		t.Errorf("static legend still rendered:\n%s", out)
+	}
+	if !strings.Contains(out, `changes: +443`) {
+		t.Errorf("missing changes prefix:\n%s", out)
 	}
 	if !strings.Contains(out, `<span class="badge badge-red">80</span>`) {
 		t.Errorf("missing port badge:\n%s", out)

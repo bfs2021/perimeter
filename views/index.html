@@ -147,7 +147,7 @@
           {{if .Edges.Scans}}
           {{$latestScan := index .Edges.Scans 0}}
           {{if $latestScan.ScanError}}
-          <span class="badge badge-gray">unreachable</span>
+          <span class="badge badge-gray" title="{{$latestScan.ScanError}}">scan failed</span>
           {{else if $latestScan.Edges.Ports}}
           {{range $latestScan.Edges.Ports}}<span class="badge badge-red">{{.Number}}</span> {{end}}
           {{else}}
