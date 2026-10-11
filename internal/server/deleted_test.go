@@ -14,6 +14,8 @@ import (
 	"perimeter/ent"
 	"perimeter/ent/target"
 	"perimeter/internal/auth"
+	"perimeter/internal/importer"
+	"perimeter/internal/notifier"
 	"perimeter/internal/storage"
 )
 
@@ -35,7 +37,9 @@ func authedServer(t *testing.T) (*Server, *ent.Client, string) {
 	if err != nil {
 		t.Fatalf("CreateSession: %v", err)
 	}
-	srv := New(storage.NewEntStorage(client), a, client, nil, nil, os.DirFS("../.."), 30*24*time.Hour, 50)
+	// The settings page lists importer and notifier providers, so it needs
+	// registries.
+	srv := New(storage.NewEntStorage(client), a, client, importer.NewRegistry(), notifier.NewRegistry(), os.DirFS("../.."), 30*24*time.Hour, 50)
 	return srv, client, token
 }
 

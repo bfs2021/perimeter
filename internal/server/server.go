@@ -1020,9 +1020,13 @@ func (s *Server) handleDeleteUser(c *fiber.Ctx) error {
 		}), "views/layouts/main")
 	}
 
-	if err := s.client.User.DeleteOneID(id).Exec(c.Context()); err != nil {
+	if err := s.auth.DeleteUser(c.Context(), id); err != nil {
+		if ent.IsNotFound(err) {
+			return c.Status(404).SendString("User not found")
+		}
+		log.Printf("delete user %d: %v", id, err)
 		return c.Render("views/settings", s.settingsData(c, fiber.Map{
-			"Error": "Failed to delete user: " + err.Error(),
+			"Error": "Could not delete the user. Check the server log for details.",
 		}), "views/layouts/main")
 	}
 
