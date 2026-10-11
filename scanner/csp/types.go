@@ -14,6 +14,21 @@ const (
 	SeverityNone        Severity = 100
 )
 
+// Level maps a severity to the badge level the views render. Lower numbers
+// mean a more severe finding, so each bound is an inclusive ceiling on s.
+func (s Severity) Level() string {
+	switch {
+	case s <= SeveritySyntax:
+		return "high"
+	case s <= SeverityHighMaybe:
+		return "medium"
+	case s <= SeverityMediumMaybe:
+		return "low"
+	default:
+		return "info"
+	}
+}
+
 // Type represents the type of a finding.
 type Type int
 
