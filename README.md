@@ -40,6 +40,7 @@ Set values in `.env` or pass CLI flags (flags win). Common ones:
 | `DB_DSN` | `--dbDSN` | — | Postgres DSN (when driver is `postgres`) |
 | `WORKER_COUNT` | `--workers` | `3` | Concurrent scan workers |
 | `PORT_INTERVAL` | `--portInterval` | `1h` | Time between port scans |
+| `PORT_TIMEOUT` | `--portTimeout` | `1s` | Timeout for a single port probe |
 | `SSL_INTERVAL` | `--sslInterval` | `12h` | Time between SSL scans |
 | `CSP_INTERVAL` | `--cspInterval` | `1h` | Time between CSP scans |
 | `CERT_EXPIRY_WINDOW` | `--certExpiryWindow` | `720h` | How close to expiry a certificate is flagged on the dashboard |

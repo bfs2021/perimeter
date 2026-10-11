@@ -146,7 +146,9 @@
           <span class="mono">{{.Address}}</span>
           {{if .Edges.Scans}}
           {{$latestScan := index .Edges.Scans 0}}
-          {{if $latestScan.Edges.Ports}}
+          {{if $latestScan.ScanError}}
+          <span class="badge badge-gray">unreachable</span>
+          {{else if $latestScan.Edges.Ports}}
           {{range $latestScan.Edges.Ports}}<span class="badge badge-red">{{.Number}}</span> {{end}}
           {{else}}
           <span class="badge badge-green">clean</span>

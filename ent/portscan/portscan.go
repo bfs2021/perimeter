@@ -20,6 +20,8 @@ const (
 	FieldLastSeenAt = "last_seen_at"
 	// FieldCheckCount holds the string denoting the check_count field in the database.
 	FieldCheckCount = "check_count"
+	// FieldScanError holds the string denoting the scan_error field in the database.
+	FieldScanError = "scan_error"
 	// EdgeIP holds the string denoting the ip edge name in mutations.
 	EdgeIP = "ip"
 	// EdgePorts holds the string denoting the ports edge name in mutations.
@@ -48,6 +50,7 @@ var Columns = []string{
 	FieldScannedAt,
 	FieldLastSeenAt,
 	FieldCheckCount,
+	FieldScanError,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "port_scans"
@@ -99,6 +102,11 @@ func ByLastSeenAt(opts ...sql.OrderTermOption) OrderOption {
 // ByCheckCount orders the results by the check_count field.
 func ByCheckCount(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCheckCount, opts...).ToFunc()
+}
+
+// ByScanError orders the results by the scan_error field.
+func ByScanError(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldScanError, opts...).ToFunc()
 }
 
 // ByIPField orders the results by ip field.

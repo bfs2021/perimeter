@@ -70,6 +70,11 @@ func CheckCount(v int) predicate.PortScan {
 	return predicate.PortScan(sql.FieldEQ(FieldCheckCount, v))
 }
 
+// ScanError applies equality check predicate on the "scan_error" field. It's identical to ScanErrorEQ.
+func ScanError(v string) predicate.PortScan {
+	return predicate.PortScan(sql.FieldEQ(FieldScanError, v))
+}
+
 // ScannedAtEQ applies the EQ predicate on the "scanned_at" field.
 func ScannedAtEQ(v time.Time) predicate.PortScan {
 	return predicate.PortScan(sql.FieldEQ(FieldScannedAt, v))
@@ -198,6 +203,81 @@ func CheckCountLT(v int) predicate.PortScan {
 // CheckCountLTE applies the LTE predicate on the "check_count" field.
 func CheckCountLTE(v int) predicate.PortScan {
 	return predicate.PortScan(sql.FieldLTE(FieldCheckCount, v))
+}
+
+// ScanErrorEQ applies the EQ predicate on the "scan_error" field.
+func ScanErrorEQ(v string) predicate.PortScan {
+	return predicate.PortScan(sql.FieldEQ(FieldScanError, v))
+}
+
+// ScanErrorNEQ applies the NEQ predicate on the "scan_error" field.
+func ScanErrorNEQ(v string) predicate.PortScan {
+	return predicate.PortScan(sql.FieldNEQ(FieldScanError, v))
+}
+
+// ScanErrorIn applies the In predicate on the "scan_error" field.
+func ScanErrorIn(vs ...string) predicate.PortScan {
+	return predicate.PortScan(sql.FieldIn(FieldScanError, vs...))
+}
+
+// ScanErrorNotIn applies the NotIn predicate on the "scan_error" field.
+func ScanErrorNotIn(vs ...string) predicate.PortScan {
+	return predicate.PortScan(sql.FieldNotIn(FieldScanError, vs...))
+}
+
+// ScanErrorGT applies the GT predicate on the "scan_error" field.
+func ScanErrorGT(v string) predicate.PortScan {
+	return predicate.PortScan(sql.FieldGT(FieldScanError, v))
+}
+
+// ScanErrorGTE applies the GTE predicate on the "scan_error" field.
+func ScanErrorGTE(v string) predicate.PortScan {
+	return predicate.PortScan(sql.FieldGTE(FieldScanError, v))
+}
+
+// ScanErrorLT applies the LT predicate on the "scan_error" field.
+func ScanErrorLT(v string) predicate.PortScan {
+	return predicate.PortScan(sql.FieldLT(FieldScanError, v))
+}
+
+// ScanErrorLTE applies the LTE predicate on the "scan_error" field.
+func ScanErrorLTE(v string) predicate.PortScan {
+	return predicate.PortScan(sql.FieldLTE(FieldScanError, v))
+}
+
+// ScanErrorContains applies the Contains predicate on the "scan_error" field.
+func ScanErrorContains(v string) predicate.PortScan {
+	return predicate.PortScan(sql.FieldContains(FieldScanError, v))
+}
+
+// ScanErrorHasPrefix applies the HasPrefix predicate on the "scan_error" field.
+func ScanErrorHasPrefix(v string) predicate.PortScan {
+	return predicate.PortScan(sql.FieldHasPrefix(FieldScanError, v))
+}
+
+// ScanErrorHasSuffix applies the HasSuffix predicate on the "scan_error" field.
+func ScanErrorHasSuffix(v string) predicate.PortScan {
+	return predicate.PortScan(sql.FieldHasSuffix(FieldScanError, v))
+}
+
+// ScanErrorIsNil applies the IsNil predicate on the "scan_error" field.
+func ScanErrorIsNil() predicate.PortScan {
+	return predicate.PortScan(sql.FieldIsNull(FieldScanError))
+}
+
+// ScanErrorNotNil applies the NotNil predicate on the "scan_error" field.
+func ScanErrorNotNil() predicate.PortScan {
+	return predicate.PortScan(sql.FieldNotNull(FieldScanError))
+}
+
+// ScanErrorEqualFold applies the EqualFold predicate on the "scan_error" field.
+func ScanErrorEqualFold(v string) predicate.PortScan {
+	return predicate.PortScan(sql.FieldEqualFold(FieldScanError, v))
+}
+
+// ScanErrorContainsFold applies the ContainsFold predicate on the "scan_error" field.
+func ScanErrorContainsFold(v string) predicate.PortScan {
+	return predicate.PortScan(sql.FieldContainsFold(FieldScanError, v))
 }
 
 // HasIP applies the HasEdge predicate on the "ip" edge.

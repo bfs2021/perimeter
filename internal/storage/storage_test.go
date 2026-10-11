@@ -569,6 +569,99 @@ func TestSavePortScanCollapsesIdenticalResults(t *testing.T) {
 	}
 }
 
+func TestSavePortScanError(t *testing.T) {
+	s := newTestStorage(t)
+	ctx := context.Background()
+
+	if _, err := s.ImportTargets(ctx, []string{"example.com"}); err != nil {
+		t.Fatalf("ImportTargets: %v", err)
+	}
+	if err := s.SaveIPs(ctx, "example.com", []string{"1.2.3.4"}); err != nil {
+		t.Fatalf("SaveIPs: %v", err)
+	}
+
+	if err := s.SavePortScan(ctx, "1.2.3.4", []int{80}); err != nil {
+		t.Fatalf("SavePortScan: %v", err)
+	}
+	ips, err := s.GetOutdatedIPs(ctx, 10, 0)
+	if err != nil || len(ips) != 1 {
+		t.Fatalf("GetOutdatedIPs: %v (want 1 IP)", err)
+	}
+	ipID := ips[0].ID
+
+	errMsg := "host unreachable: dial tcp 1.2.3.4:80: connect: no route to host"
+	for range 3 {
+		if err := s.SavePortScanError(ctx, "1.2.3.4", errMsg); err != nil {
+			t.Fatalf("SavePortScanError: %v", err)
+		}
+	}
+
+	scans, total, err := s.GetIPScansPage(ctx, ipID, 10, 0)
+	if err != nil {
+		t.Fatalf("GetIPScansPage: %v", err)
+	}
+	if total != 2 {
+		t.Fatalf("expected 2 rows (result + collapsed error), got %d", total)
+	}
+	if got := scans[0].ScanError; got != errMsg {
+		t.Errorf("newest row scan_error = %q, want %q", got, errMsg)
+	}
+	if len(scans[0].Edges.Ports) != 0 {
+		t.Errorf("error row carries ports %v, want none", scans[0].Edges.Ports)
+	}
+	if scans[0].CheckCount != 3 {
+		t.Errorf("error row check_count = %d, want 3", scans[0].CheckCount)
+	}
+
+	// A different error message starts a new row.
+	if err := s.SavePortScanError(ctx, "1.2.3.4", "host unreachable: other reason"); err != nil {
+		t.Fatalf("SavePortScanError (different): %v", err)
+	}
+	_, total, err = s.GetIPScansPage(ctx, ipID, 10, 0)
+	if err != nil {
+		t.Fatalf("GetIPScansPage: %v", err)
+	}
+	if total != 3 {
+		t.Errorf("expected 3 rows after a different error, got %d", total)
+	}
+
+	// A normal result after an error creates a new row; it never collapses
+	// into the error row.
+	if err := s.SavePortScan(ctx, "1.2.3.4", []int{80}); err != nil {
+		t.Fatalf("SavePortScan after error: %v", err)
+	}
+	scans, total, err = s.GetIPScansPage(ctx, ipID, 10, 0)
+	if err != nil {
+		t.Fatalf("GetIPScansPage: %v", err)
+	}
+	if total != 4 {
+		t.Fatalf("expected 4 rows after recovery, got %d", total)
+	}
+	if scans[0].ScanError != "" {
+		t.Errorf("newest row scan_error = %q, want empty", scans[0].ScanError)
+	}
+
+	// GetPreviousPortCounts skips error rows: a host that went unreachable
+	// after a good scan is diffed against that scan, not against nothing.
+	ports, err := s.GetPreviousPortCounts(ctx, "1.2.3.4")
+	if err != nil {
+		t.Fatalf("GetPreviousPortCounts: %v", err)
+	}
+	if len(ports) != 1 || ports[0] != 80 {
+		t.Errorf("GetPreviousPortCounts = %v, want [80]", ports)
+	}
+	if err := s.SavePortScanError(ctx, "1.2.3.4", errMsg); err != nil {
+		t.Fatalf("SavePortScanError (again): %v", err)
+	}
+	ports, err = s.GetPreviousPortCounts(ctx, "1.2.3.4")
+	if err != nil {
+		t.Fatalf("GetPreviousPortCounts after error: %v", err)
+	}
+	if len(ports) != 1 || ports[0] != 80 {
+		t.Errorf("GetPreviousPortCounts = %v, want [80] (error rows skipped)", ports)
+	}
+}
+
 func TestSaveSSLScanCollapsesIdenticalResults(t *testing.T) {
 	s := newTestStorage(t)
 	ctx := context.Background()

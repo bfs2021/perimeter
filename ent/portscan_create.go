@@ -64,6 +64,20 @@ func (_c *PortScanCreate) SetNillableCheckCount(v *int) *PortScanCreate {
 	return _c
 }
 
+// SetScanError sets the "scan_error" field.
+func (_c *PortScanCreate) SetScanError(v string) *PortScanCreate {
+	_c.mutation.SetScanError(v)
+	return _c
+}
+
+// SetNillableScanError sets the "scan_error" field if the given value is not nil.
+func (_c *PortScanCreate) SetNillableScanError(v *string) *PortScanCreate {
+	if v != nil {
+		_c.SetScanError(*v)
+	}
+	return _c
+}
+
 // SetIPID sets the "ip" edge to the IP entity by ID.
 func (_c *PortScanCreate) SetIPID(id int) *PortScanCreate {
 	_c.mutation.SetIPID(id)
@@ -183,6 +197,10 @@ func (_c *PortScanCreate) createSpec() (*PortScan, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.CheckCount(); ok {
 		_spec.SetField(portscan.FieldCheckCount, field.TypeInt, value)
 		_node.CheckCount = value
+	}
+	if value, ok := _c.mutation.ScanError(); ok {
+		_spec.SetField(portscan.FieldScanError, field.TypeString, value)
+		_node.ScanError = value
 	}
 	if nodes := _c.mutation.IPIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

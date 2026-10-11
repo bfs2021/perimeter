@@ -85,6 +85,26 @@ func (_u *PortScanUpdate) AddCheckCount(v int) *PortScanUpdate {
 	return _u
 }
 
+// SetScanError sets the "scan_error" field.
+func (_u *PortScanUpdate) SetScanError(v string) *PortScanUpdate {
+	_u.mutation.SetScanError(v)
+	return _u
+}
+
+// SetNillableScanError sets the "scan_error" field if the given value is not nil.
+func (_u *PortScanUpdate) SetNillableScanError(v *string) *PortScanUpdate {
+	if v != nil {
+		_u.SetScanError(*v)
+	}
+	return _u
+}
+
+// ClearScanError clears the value of the "scan_error" field.
+func (_u *PortScanUpdate) ClearScanError() *PortScanUpdate {
+	_u.mutation.ClearScanError()
+	return _u
+}
+
 // SetIPID sets the "ip" edge to the IP entity by ID.
 func (_u *PortScanUpdate) SetIPID(id int) *PortScanUpdate {
 	_u.mutation.SetIPID(id)
@@ -204,6 +224,12 @@ func (_u *PortScanUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.AddedCheckCount(); ok {
 		_spec.AddField(portscan.FieldCheckCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.ScanError(); ok {
+		_spec.SetField(portscan.FieldScanError, field.TypeString, value)
+	}
+	if _u.mutation.ScanErrorCleared() {
+		_spec.ClearField(portscan.FieldScanError, field.TypeString)
 	}
 	if _u.mutation.IPCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -351,6 +377,26 @@ func (_u *PortScanUpdateOne) SetNillableCheckCount(v *int) *PortScanUpdateOne {
 // AddCheckCount adds value to the "check_count" field.
 func (_u *PortScanUpdateOne) AddCheckCount(v int) *PortScanUpdateOne {
 	_u.mutation.AddCheckCount(v)
+	return _u
+}
+
+// SetScanError sets the "scan_error" field.
+func (_u *PortScanUpdateOne) SetScanError(v string) *PortScanUpdateOne {
+	_u.mutation.SetScanError(v)
+	return _u
+}
+
+// SetNillableScanError sets the "scan_error" field if the given value is not nil.
+func (_u *PortScanUpdateOne) SetNillableScanError(v *string) *PortScanUpdateOne {
+	if v != nil {
+		_u.SetScanError(*v)
+	}
+	return _u
+}
+
+// ClearScanError clears the value of the "scan_error" field.
+func (_u *PortScanUpdateOne) ClearScanError() *PortScanUpdateOne {
+	_u.mutation.ClearScanError()
 	return _u
 }
 
@@ -503,6 +549,12 @@ func (_u *PortScanUpdateOne) sqlSave(ctx context.Context) (_node *PortScan, err 
 	}
 	if value, ok := _u.mutation.AddedCheckCount(); ok {
 		_spec.AddField(portscan.FieldCheckCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.ScanError(); ok {
+		_spec.SetField(portscan.FieldScanError, field.TypeString, value)
+	}
+	if _u.mutation.ScanErrorCleared() {
+		_spec.ClearField(portscan.FieldScanError, field.TypeString)
 	}
 	if _u.mutation.IPCleared() {
 		edge := &sqlgraph.EdgeSpec{
