@@ -39,6 +39,8 @@ func cspN(n int) *int { return &n }
 //	f      3      A      +10d    0    ok
 //	g      0      -      -       -    unreachable (probe got no response)
 //	h      0      -      -       -    unresolved
+//	i      0      -      +30d10h -    pending (issue #42: floor 30d, inside a 30d window)
+//	j      0      -      +31d1h  -    pending (issue #42: floor 31d, outside a 30d window)
 func dashboardRows(now time.Time) []fixtureRow {
 	in := func(days int) time.Time { return now.Add(time.Duration(days) * 24 * time.Hour) }
 	return []fixtureRow{
@@ -50,6 +52,8 @@ func dashboardRows(now time.Time) []fixtureRow {
 		{input: "f.test", hasIP: true, ports: []int{22, 80, 8080}, grade: "A", expiry: in(10), csp: cspN(0)},
 		{input: "g.test", probeErr: true},
 		{input: "h.test", resolveErr: true},
+		{input: "i.test", expiry: in(30).Add(10 * time.Hour)},
+		{input: "j.test", expiry: in(31).Add(time.Hour)},
 	}
 }
 
@@ -78,7 +82,9 @@ func seedTargets(t *testing.T, s *storage.EntStorage, rows []fixtureRow) {
 			must("SaveIPs "+r.input, s.SaveIPs(ctx, r.input, []string{addr}))
 			must("SavePortScan "+r.input, s.SavePortScan(ctx, addr, r.ports))
 		}
-		if r.grade != "" {
+		// The expiry rows without a grade (issue #42 boundary) must not
+		// pick up an SSL grade, so the SSL filters and sort are untouched.
+		if r.grade != "" || !r.expiry.IsZero() {
 			must("SaveSSLScan "+r.input, s.SaveSSLScan(ctx, r.input, storage.SSLResult{
 				Grade:      r.grade,
 				Status:     "READY",
@@ -128,14 +134,14 @@ func TestListTargetsFilters(t *testing.T) {
 		f    storage.TargetFilter
 		want []string
 	}{
-		{"no filter", storage.TargetFilter{}, []string{"a.test", "b.test", "c.test", "d.test", "e.test", "f.test", "g.test", "h.test"}},
+		{"no filter", storage.TargetFilter{}, []string{"a.test", "b.test", "c.test", "d.test", "e.test", "f.test", "g.test", "h.test", "i.test", "j.test"}},
 		{"state unreachable", storage.TargetFilter{States: []target.Reachability{target.ReachabilityUnreachable}}, []string{"g.test"}},
 		{"state unresolved", storage.TargetFilter{States: []target.Reachability{target.ReachabilityUnresolved}}, []string{"h.test"}},
-		{"state pending", storage.TargetFilter{States: []target.Reachability{target.ReachabilityPending}}, []string{"b.test"}},
+		{"state pending", storage.TargetFilter{States: []target.Reachability{target.ReachabilityPending}}, []string{"b.test", "i.test", "j.test"}},
 		{"states ok or unresolved", storage.TargetFilter{States: []target.Reachability{target.ReachabilityOk, target.ReachabilityUnresolved}}, []string{"a.test", "c.test", "d.test", "e.test", "f.test", "h.test"}},
 		{"csp issues", storage.TargetFilter{CSP: "issues"}, []string{"a.test", "d.test"}},
 		{"csp ok", storage.TargetFilter{CSP: "ok"}, []string{"c.test", "f.test"}},
-		{"csp none", storage.TargetFilter{CSP: "none"}, []string{"b.test", "e.test", "g.test", "h.test"}},
+		{"csp none", storage.TargetFilter{CSP: "none"}, []string{"b.test", "e.test", "g.test", "h.test", "i.test", "j.test"}},
 		{"ssl grade A", storage.TargetFilter{SSLGrade: "A"}, []string{"a.test", "f.test"}},
 		{"ssl grade A+", storage.TargetFilter{SSLGrade: "A+"}, []string{"d.test"}},
 		{"ssl below A", storage.TargetFilter{SSLBelow: "A"}, []string{"c.test", "e.test"}},
@@ -145,7 +151,10 @@ func TestListTargetsFilters(t *testing.T) {
 		{"port 8080", storage.TargetFilter{Port: 8080}, []string{"d.test", "f.test"}},
 		{"port 8443", storage.TargetFilter{Port: 8443}, []string{"e.test"}},
 		{"port nobody has", storage.TargetFilter{Port: 9999}, []string{}},
-		{"expiring within 30d includes expired", storage.TargetFilter{ExpiringWithin: 30 * 24 * time.Hour}, []string{"a.test", "d.test", "e.test", "f.test"}},
+		// Issue #42 boundary: i.test is 30d+10h out, so floor(days) = 30
+		// and it matches a 30d window; j.test at 31d+1h does not.
+		{"expiring within 30d includes expired", storage.TargetFilter{ExpiringWithin: 30 * 24 * time.Hour}, []string{"a.test", "d.test", "e.test", "f.test", "i.test"}},
+		{"expiring within 31d includes j too", storage.TargetFilter{ExpiringWithin: 31 * 24 * time.Hour}, []string{"a.test", "d.test", "e.test", "f.test", "i.test", "j.test"}},
 		{"expiring within 1h is only expired", storage.TargetFilter{ExpiringWithin: time.Hour}, []string{"d.test"}},
 		{"combined: csp issues and expiring", storage.TargetFilter{CSP: "issues", ExpiringWithin: 30 * 24 * time.Hour}, []string{"a.test", "d.test"}},
 		{"combined: ok state, csp issues, grade A", storage.TargetFilter{States: []target.Reachability{target.ReachabilityOk}, CSP: "issues", SSLGrade: "A"}, []string{"a.test"}},
@@ -166,20 +175,21 @@ func TestListTargetsSortEveryFieldBothDirections(t *testing.T) {
 		want []string
 	}{
 		// Input: alphabetical either way.
-		{"target asc", storage.TargetSort{Field: storage.SortTarget}, []string{"a.test", "b.test", "c.test", "d.test", "e.test", "f.test", "g.test", "h.test"}},
-		{"target desc", storage.TargetSort{Field: storage.SortTarget, Desc: true}, []string{"h.test", "g.test", "f.test", "e.test", "d.test", "c.test", "b.test", "a.test"}},
+		{"target asc", storage.TargetSort{Field: storage.SortTarget}, []string{"a.test", "b.test", "c.test", "d.test", "e.test", "f.test", "g.test", "h.test", "i.test", "j.test"}},
+		{"target desc", storage.TargetSort{Field: storage.SortTarget, Desc: true}, []string{"j.test", "i.test", "h.test", "g.test", "f.test", "e.test", "d.test", "c.test", "b.test", "a.test"}},
 		// Ports (count): ties on input; zero-port rows are real values, not NULL.
-		{"ports asc", storage.TargetSort{Field: storage.SortPorts}, []string{"b.test", "g.test", "h.test", "e.test", "a.test", "d.test", "f.test", "c.test"}},
-		{"ports desc", storage.TargetSort{Field: storage.SortPorts, Desc: true}, []string{"c.test", "a.test", "d.test", "f.test", "e.test", "b.test", "g.test", "h.test"}},
-		// CSP: NULLs (b, e, g, h) last in both directions.
-		{"csp asc", storage.TargetSort{Field: storage.SortCSP}, []string{"c.test", "f.test", "a.test", "d.test", "b.test", "e.test", "g.test", "h.test"}},
-		{"csp desc", storage.TargetSort{Field: storage.SortCSP, Desc: true}, []string{"a.test", "d.test", "c.test", "f.test", "b.test", "e.test", "g.test", "h.test"}},
-		// SSL: ascending is best first; ungraded (b, g, h) last in both directions.
-		{"ssl asc (best first)", storage.TargetSort{Field: storage.SortSSL}, []string{"d.test", "a.test", "f.test", "c.test", "e.test", "b.test", "g.test", "h.test"}},
-		{"ssl desc (worst first)", storage.TargetSort{Field: storage.SortSSL, Desc: true}, []string{"e.test", "c.test", "a.test", "f.test", "d.test", "b.test", "g.test", "h.test"}},
-		// Expiry: asc soonest first; NULLs (b, g, h) last in both directions.
-		{"expiry asc (soonest first)", storage.TargetSort{Field: storage.SortExpiry}, []string{"d.test", "a.test", "f.test", "e.test", "c.test", "b.test", "g.test", "h.test"}},
-		{"expiry desc (latest first)", storage.TargetSort{Field: storage.SortExpiry, Desc: true}, []string{"c.test", "e.test", "a.test", "f.test", "d.test", "b.test", "g.test", "h.test"}},
+		{"ports asc", storage.TargetSort{Field: storage.SortPorts}, []string{"b.test", "g.test", "h.test", "i.test", "j.test", "e.test", "a.test", "d.test", "f.test", "c.test"}},
+		{"ports desc", storage.TargetSort{Field: storage.SortPorts, Desc: true}, []string{"c.test", "a.test", "d.test", "f.test", "e.test", "b.test", "g.test", "h.test", "i.test", "j.test"}},
+		// CSP: NULLs (b, e, g, h, i, j) last in both directions.
+		{"csp asc", storage.TargetSort{Field: storage.SortCSP}, []string{"c.test", "f.test", "a.test", "d.test", "b.test", "e.test", "g.test", "h.test", "i.test", "j.test"}},
+		{"csp desc", storage.TargetSort{Field: storage.SortCSP, Desc: true}, []string{"a.test", "d.test", "c.test", "f.test", "b.test", "e.test", "g.test", "h.test", "i.test", "j.test"}},
+		// SSL: ascending is best first; ungraded (b, g, h, i, j) last in both directions.
+		{"ssl asc (best first)", storage.TargetSort{Field: storage.SortSSL}, []string{"d.test", "a.test", "f.test", "c.test", "e.test", "b.test", "g.test", "h.test", "i.test", "j.test"}},
+		{"ssl desc (worst first)", storage.TargetSort{Field: storage.SortSSL, Desc: true}, []string{"e.test", "c.test", "a.test", "f.test", "d.test", "b.test", "g.test", "h.test", "i.test", "j.test"}},
+		// Expiry: asc soonest first; i (30d10h) and j (31d1h) sit between e
+		// and c; NULLs (b, g, h) last in both directions.
+		{"expiry asc (soonest first)", storage.TargetSort{Field: storage.SortExpiry}, []string{"d.test", "a.test", "f.test", "e.test", "i.test", "j.test", "c.test", "b.test", "g.test", "h.test"}},
+		{"expiry desc (latest first)", storage.TargetSort{Field: storage.SortExpiry, Desc: true}, []string{"c.test", "j.test", "i.test", "e.test", "a.test", "f.test", "d.test", "b.test", "g.test", "h.test"}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -192,8 +202,8 @@ func TestListTargetsPagingIsDisjointAndOrdered(t *testing.T) {
 	s := newDashboardStorage(t)
 	sort := storage.TargetSort{Field: storage.SortExpiry}
 	full := listInputs(t, s, storage.TargetFilter{}, sort, 0, 0)
-	if len(full) != 8 {
-		t.Fatalf("full list has %d rows, want 8", len(full))
+	if len(full) != 10 {
+		t.Fatalf("full list has %d rows, want 10", len(full))
 	}
 
 	var paged []string
@@ -201,17 +211,19 @@ func TestListTargetsPagingIsDisjointAndOrdered(t *testing.T) {
 		listInputs(t, s, storage.TargetFilter{}, sort, 3, 0),
 		listInputs(t, s, storage.TargetFilter{}, sort, 3, 3),
 		listInputs(t, s, storage.TargetFilter{}, sort, 3, 6),
+		listInputs(t, s, storage.TargetFilter{}, sort, 3, 9),
 	}
 	assertInputs(t, pages[0], []string{"d.test", "a.test", "f.test"})
-	assertInputs(t, pages[1], []string{"e.test", "c.test", "b.test"})
-	assertInputs(t, pages[2], []string{"g.test", "h.test"})
+	assertInputs(t, pages[1], []string{"e.test", "i.test", "j.test"})
+	assertInputs(t, pages[2], []string{"c.test", "b.test", "g.test"})
+	assertInputs(t, pages[3], []string{"h.test"})
 	for _, p := range pages {
 		paged = append(paged, p...)
 	}
 	assertInputs(t, paged, full)
 
 	// Offset without a limit: everything after the offset.
-	assertInputs(t, listInputs(t, s, storage.TargetFilter{}, sort, 0, 6), []string{"g.test", "h.test"})
+	assertInputs(t, listInputs(t, s, storage.TargetFilter{}, sort, 0, 6), []string{"c.test", "b.test", "g.test", "h.test"})
 }
 
 func TestListTargetsFilterAndSortTogether(t *testing.T) {
@@ -314,16 +326,17 @@ func TestTargetStatsFilters(t *testing.T) {
 		now  time.Time
 		want storage.TargetStats
 	}{
-		// Expiring: a (+10d), e (+25d), f (+10d). d is expired, c is outside.
-		// CSP issues: a and d. Open ports: 3+0+5+3+1+3+0+0.
-		{"all", storage.TargetFilter{}, now, storage.TargetStats{Total: 8, OpenPorts: 15, ExpiringCerts: 3, CSPIssues: 2}},
+		// Expiring: a (+10d), e (+25d), f (+10d), i (+30d10h). The upper
+		// bound is +31d, so j (+31d1h) is outside and d is expired.
+		// CSP issues: a and d. Open ports: 3+0+5+3+1+3+0+0+0+0.
+		{"all", storage.TargetFilter{}, now, storage.TargetStats{Total: 10, OpenPorts: 15, ExpiringCerts: 4, CSPIssues: 2}},
 		{"states ok", storage.TargetFilter{States: []target.Reachability{target.ReachabilityOk}}, now,
 			storage.TargetStats{Total: 5, OpenPorts: 15, ExpiringCerts: 3, CSPIssues: 2}},
 		{"csp ok", storage.TargetFilter{CSP: "ok"}, now, storage.TargetStats{Total: 2, OpenPorts: 8, ExpiringCerts: 1, CSPIssues: 0}},
 		{"port 8443", storage.TargetFilter{Port: 8443}, now, storage.TargetStats{Total: 1, OpenPorts: 1, ExpiringCerts: 1, CSPIssues: 0}},
-		// The clock moves to +20d: e (+25d) is the only certificate left in
-		// the window, and a and f have already expired.
-		{"later now", storage.TargetFilter{}, now.Add(20 * 24 * time.Hour), storage.TargetStats{Total: 8, OpenPorts: 15, ExpiringCerts: 1, CSPIssues: 2}},
+		// The clock moves to +20d: e (+25d), i and j are the certificates
+		// left in the window, and a and f have already expired.
+		{"later now", storage.TargetFilter{}, now.Add(20 * 24 * time.Hour), storage.TargetStats{Total: 10, OpenPorts: 15, ExpiringCerts: 3, CSPIssues: 2}},
 		// Empty match set: zeros, no error.
 		{"empty match", storage.TargetFilter{CSP: "none", SSLGrade: "A+"}, now, storage.TargetStats{}},
 		{"no such port", storage.TargetFilter{Port: 9999}, now, storage.TargetStats{}},
@@ -354,8 +367,8 @@ func TestTargetStatsIsOverAllMatchesNotAPage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TargetStats: %v", err)
 	}
-	if stats.Total != 8 {
-		t.Errorf("stats.Total = %d, want 8 (all matches, not the page of 2)", stats.Total)
+	if stats.Total != 10 {
+		t.Errorf("stats.Total = %d, want 10 (all matches, not the page of 2)", stats.Total)
 	}
 }
 

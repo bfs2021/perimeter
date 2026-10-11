@@ -395,7 +395,8 @@ var dashboardParams = []string{"state", "tag", "csp", "ssl", "ssl_below", "port"
 
 const (
 	defaultDashboardPageSize = 50
-	// maxExpiringDays keeps days*24h inside time.Duration.
+	// maxExpiringDays keeps days*24h, plus the 24h targetPredicates adds
+	// on top (issue #42), inside time.Duration.
 	maxExpiringDays = 100000
 )
 

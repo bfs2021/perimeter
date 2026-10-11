@@ -42,8 +42,10 @@ type TargetFilter struct {
 	// open. 0 means no constraint.
 	Port int
 	// ExpiringWithin keeps targets whose latest_cert_expiry is before
-	// now+ExpiringWithin, including certificates that already expired.
-	// 0 means no constraint.
+	// now+ExpiringWithin+24h, i.e. for a window of N days expiry <
+	// now+(N+1)*24h: floor of whole days until expiry <= N, in step with
+	// the badge's daysUntil (issue #42). Certificates that already
+	// expired are included. 0 means no constraint.
 	ExpiringWithin time.Duration
 }
 
@@ -77,8 +79,9 @@ type TargetStats struct {
 	Total int
 	// OpenPorts sums open_port_count.
 	OpenPorts int
-	// ExpiringCerts counts certificates expiring after now but within the
-	// window. Already expired certificates do not count.
+	// ExpiringCerts counts certificates expiring after now but before
+	// now+window+24h, in step with the badge's daysUntil (issue #42).
+	// Already expired certificates do not count.
 	ExpiringCerts int
 	// CSPIssues counts targets with latest_csp_finding_count > 0.
 	CSPIssues int
@@ -137,9 +140,11 @@ func targetPredicates(f TargetFilter) ([]predicate.Target, error) {
 		)))
 	}
 	if f.ExpiringWithin != 0 {
+		// +24h: a certificate with floor N whole days left matches an
+		// N-day window, in step with the badge's daysUntil (issue #42).
 		ps = append(ps,
 			target.LatestCertExpiryNotNil(),
-			target.LatestCertExpiryLT(time.Now().Add(f.ExpiringWithin)),
+			target.LatestCertExpiryLT(time.Now().Add(f.ExpiringWithin+24*time.Hour)),
 		)
 	}
 	return ps, nil
@@ -265,9 +270,11 @@ func (s *EntStorage) TargetStats(ctx context.Context, f TargetFilter, now time.T
 	if st.OpenPorts, err = matching().Aggregate(ent.Sum(target.FieldOpenPortCount)).Int(ctx); err != nil {
 		return TargetStats{}, err
 	}
+	// +24h as in targetPredicates, so the count agrees with the badge
+	// and with the ExpiringWithin filter (issue #42).
 	if st.ExpiringCerts, err = matching(
 		target.LatestCertExpiryGT(now),
-		target.LatestCertExpiryLT(now.Add(window)),
+		target.LatestCertExpiryLT(now.Add(window+24*time.Hour)),
 	).Count(ctx); err != nil {
 		return TargetStats{}, err
 	}
