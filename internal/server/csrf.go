@@ -29,7 +29,7 @@ func crossOriginProtection() fiber.Handler {
 			}
 		}
 		if err := cop.Check(req); err != nil {
-			return c.Status(fiber.StatusForbidden).SendString("Cross-origin request blocked")
+			return fiber.NewError(fiber.StatusForbidden, "Cross-origin request blocked")
 		}
 		return c.Next()
 	}
