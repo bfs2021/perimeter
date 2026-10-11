@@ -12,7 +12,9 @@ import (
 
 	"perimeter/ent"
 	"perimeter/ent/invite"
+	"perimeter/ent/schema"
 	"perimeter/ent/session"
+	"perimeter/ent/target"
 	"perimeter/ent/user"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -378,6 +380,57 @@ func (a *Auth) DeleteSession(ctx context.Context, token string) error {
 	_, err := a.client.Session.Delete().
 		Where(session.TokenHashEQ(hash)).
 		Exec(ctx)
+	return err
+}
+
+// --- Users ---
+
+// DeleteUser removes a user together with their sessions and invites (issue #32).
+// Targets they own are kept; the owner edge is cleared so soft-deleted targets
+// stay restorable without a dangling owner.
+func (a *Auth) DeleteUser(ctx context.Context, id int) error {
+	tx, err := a.client.Tx(ctx)
+	if err != nil {
+		return err
+	}
+
+	if _, err := tx.Session.Delete().
+		Where(session.HasUserWith(user.IDEQ(id))).
+		Exec(ctx); err != nil {
+		return rollback(tx, err)
+	}
+	if _, err := tx.Invite.Delete().
+		Where(invite.HasInvitedByWith(user.IDEQ(id))).
+		Exec(ctx); err != nil {
+		return rollback(tx, err)
+	}
+
+	targets, err := tx.Target.Query().
+		Where(target.HasOwnerWith(user.IDEQ(id))).
+		All(schema.SkipSoftDelete(ctx))
+	if err != nil {
+		return rollback(tx, err)
+	}
+	if len(targets) > 0 {
+		ids := make([]int, 0, len(targets))
+		for _, t := range targets {
+			ids = append(ids, t.ID)
+		}
+		if _, err := tx.Target.Update().Where(target.IDIn(ids...)).ClearOwner().Save(ctx); err != nil {
+			return rollback(tx, err)
+		}
+	}
+
+	if err := tx.User.DeleteOneID(id).Exec(ctx); err != nil {
+		return rollback(tx, err)
+	}
+	return tx.Commit()
+}
+
+func rollback(tx *ent.Tx, err error) error {
+	if rerr := tx.Rollback(); rerr != nil {
+		err = fmt.Errorf("%w: %v", err, rerr)
+	}
 	return err
 }
 
