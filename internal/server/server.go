@@ -949,12 +949,18 @@ func (s *Server) handleImportSubmit(c *fiber.Ctx) error {
 		return c.Status(500).SendString(err.Error())
 	}
 
-	_, err = s.storage.ImportTargets(c.Context(), targets)
+	res, err := s.storage.ImportTargetsReport(c.Context(), targets)
 	if err != nil {
 		return c.Status(500).SendString(err.Error())
 	}
 
-	return c.Redirect("/")
+	// Re-render the form with the result so the user sees what happened; the
+	// invalid lines are prefilled in the textarea for a fixed resubmit.
+	return c.Render("views/import", s.templateData(c, fiber.Map{
+		"Title":   "Import Targets",
+		"Result":  res,
+		"Prefill": strings.Join(res.Invalid, "\n"),
+	}), "views/layouts/main")
 }
 
 // --- Admin handlers ---
@@ -1320,24 +1326,35 @@ func (s *Server) handleUpdateTargetTags(c *fiber.Ctx) error {
 		return c.Status(404).SendString("Target not found")
 	}
 
-	// Get selected tag IDs from form
+	// Get selected tag IDs from form. A bad or unknown id rejects the whole
+	// request, so a failed submission cannot wipe the tags.
 	tagIDs := c.Context().PostArgs().PeekMulti("tags")
+	seen := make(map[int]bool)
 	var ids []int
 	for _, raw := range tagIDs {
-		if tid, err := strconv.Atoi(string(raw)); err == nil {
+		tid, err := strconv.Atoi(string(raw))
+		if err != nil {
+			return c.Status(400).SendString("Invalid tag id")
+		}
+		if !seen[tid] {
+			seen[tid] = true
 			ids = append(ids, tid)
 		}
 	}
-
-	// Clear existing tags and set new ones
-	if err := s.client.Target.UpdateOne(t).ClearTags().Exec(c.Context()); err != nil {
-		return c.Status(500).SendString("Failed to clear tags")
-	}
 	if len(ids) > 0 {
-		tags, _ := s.client.Tag.Query().Where(tag.IDIn(ids...)).All(c.Context())
-		if err := s.client.Target.UpdateOne(t).AddTags(tags...).Exec(c.Context()); err != nil {
-			return c.Status(500).SendString("Failed to set tags")
+		found, err := s.client.Tag.Query().Where(tag.IDIn(ids...)).All(c.Context())
+		if err != nil {
+			return c.Status(500).SendString("Failed to load tags")
 		}
+		if len(found) != len(ids) {
+			return c.Status(400).SendString("Unknown tag")
+		}
+	}
+
+	// Clear existing tags and set the new ones in one update; no values
+	// clears all tags.
+	if err := s.client.Target.UpdateOne(t).ClearTags().AddTagIDs(ids...).Exec(c.Context()); err != nil {
+		return c.Status(500).SendString("Failed to update tags")
 	}
 
 	return c.Redirect(fmt.Sprintf("/targets/%d", id))

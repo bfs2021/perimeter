@@ -2,6 +2,19 @@
 
 <h1>Import Targets</h1>
 
+{{if .Result}}
+<p>{{len .Result.Added}} added, {{len .Result.Existing}} already present, {{len .Result.Restored}} restored, {{len .Result.Invalid}} invalid</p>
+{{if .Result.Invalid}}
+<div class="alert alert-error">
+  <strong>Invalid lines</strong>
+  <ul>
+    {{range .Result.Invalid}}<li>{{.}}</li>{{end}}
+  </ul>
+</div>
+{{end}}
+<a href="/">Back to dashboard</a>
+{{end}}
+
 <form action="/import" method="POST">
   <div class="form-group">
     <label for="source">Source</label>
@@ -17,7 +30,7 @@
   <div class="form-group">
     <label for="manual_input">Targets (one per line)</label>
     <textarea name="manual_input" id="manual_input" rows="10" style="width: 100%; max-width: 500px;"
-      placeholder="example.com&#10;192.168.1.1"></textarea>
+      placeholder="example.com&#10;192.168.1.1">{{.Prefill}}</textarea>
   </div>
 
   <button type="submit" class="btn-primary">Import</button>
