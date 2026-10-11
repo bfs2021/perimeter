@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -106,6 +107,10 @@ func TestUnknownPathForAuthenticatedNonAdminIs404(t *testing.T) {
 			resp := send(t, srv, tokens[role], "GET", "/no-such-page", "", "")
 			if resp.StatusCode != http.StatusNotFound {
 				t.Fatalf("GET /no-such-page: status %d, want 404; body:\n%s", resp.StatusCode, resp.Body)
+			}
+			// Unknown URLs render the styled 404 page, not plain text.
+			if !strings.Contains(resp.Body, "Page not found") || !strings.Contains(resp.Body, "Back to dashboard") {
+				t.Errorf("GET /no-such-page body is not the error page; body:\n%s", resp.Body)
 			}
 		})
 	}

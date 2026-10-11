@@ -12,7 +12,7 @@
     <div style="font-size: 24px; font-weight: 600; {{if gt .TotalOpenPorts 0}}color: #dc2626;{{end}}">{{.TotalOpenPorts}}</div>
   </div>
   <div style="background: #fff; border: 1px solid #e5e5e5; border-radius: 6px; padding: 16px;">
-    <div class="text-muted" style="margin-bottom: 4px;">Expiring Certs</div>
+    <div class="text-muted" style="margin-bottom: 4px;">Expiring Certs (&le; {{.CertExpiryDays}}d)</div>
     <div style="font-size: 24px; font-weight: 600; {{if gt .ExpiringCerts 0}}color: #dc2626;{{end}}">{{.ExpiringCerts}}</div>
   </div>
   <div style="background: #fff; border: 1px solid #e5e5e5; border-radius: 6px; padding: 16px;">
@@ -23,9 +23,9 @@
 
 <div style="margin-bottom: 8px;">
   <span class="text-muted" style="margin-right: 8px;">State:</span>
-  <a href="{{withQuery $.Query "state" ""}}" style="margin-right: 6px; {{if eq .FilterState ""}}font-weight: 600;{{end}}">All</a>
+  <a href="{{withQuery $.Query "state" ""}}" style="margin-right: 6px; {{if eq .FilterState ""}}font-weight: 600;{{end}}">All ({{.StateTotal}})</a>
   {{range .States}}
-  <a href="{{withQuery $.Query "state" (print .)}}" style="margin-right: 6px; {{if eq $.FilterState (print .)}}font-weight: 600;{{end}}">{{.}}</a>
+  <a href="{{withQuery $.Query "state" (print .)}}" style="margin-right: 6px; {{if eq $.FilterState (print .)}}font-weight: 600;{{end}}">{{.}} ({{index $.StateCounts .}})</a>
   {{end}}
 </div>
 

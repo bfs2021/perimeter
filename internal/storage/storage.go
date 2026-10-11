@@ -46,6 +46,10 @@ type Storage interface {
 	GetTargets(ctx context.Context, states ...target.Reachability) ([]*ent.Target, error)
 	ListTargets(ctx context.Context, f TargetFilter, sort TargetSort, limit, offset int) ([]*ent.Target, error)
 	TargetStats(ctx context.Context, f TargetFilter, now time.Time, window time.Duration) (TargetStats, error)
+	// StateCounts counts the targets matching f per reachability state,
+	// ignoring f.States: the dashboard's state filter links show the count of
+	// every state the other filters still match.
+	StateCounts(ctx context.Context, f TargetFilter) (map[target.Reachability]int, error)
 	GetTarget(ctx context.Context, id int) (*ent.Target, error)
 	GetTargetBasic(ctx context.Context, id int) (*ent.Target, error)
 	GetIPScansPage(ctx context.Context, ipID, limit, offset int) ([]*ent.PortScan, int, error)

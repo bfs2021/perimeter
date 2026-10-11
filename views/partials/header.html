@@ -1,6 +1,9 @@
 <nav>
   <div>
     <a href="/">Dashboard</a>
+    {{if .User}}
+    <a href="/targets/deleted">Deleted</a>
+    {{end}}
     {{if .CanWrite}}
     <a href="/import">Import</a>
     {{end}}

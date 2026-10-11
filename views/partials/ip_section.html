@@ -10,7 +10,7 @@
     <tr>
       <td class="text-muted">
         {{.ScannedAt.Format "Jan 02, 2006 15:04"}}
-        {{if not .LastSeenAt.IsZero}}<div><small>last checked {{.LastSeenAt.Format "Jan 02 15:04"}} &middot; {{.CheckCount}} checks</small></div>{{end}}
+        {{if not .LastSeenAt.IsZero}}<div><small>last checked {{.LastSeenAt.Format "Jan 02 15:04"}} &middot; {{.CheckCount}} {{if eq .CheckCount 1}}check{{else}}checks{{end}}</small></div>{{end}}
       </td>
       <td>
         {{if .ScanError}}
@@ -21,7 +21,7 @@
         <span class="badge badge-green">none</span>
         {{end}}
         {{if and (not .ScanError) (or .Added .Removed)}}
-        <div><small class="text-muted">{{range .Added}}+{{.}} {{end}}{{range .Removed}}&minus;{{.}} {{end}}</small></div>
+        <div><small class="text-muted" title="+N: opened since the previous scan, &minus;N: closed since the previous scan">{{range .Added}}+{{.}} {{end}}{{range .Removed}}&minus;{{.}} {{end}}</small></div>
         {{end}}
       </td>
     </tr>
@@ -30,4 +30,7 @@
     {{end}}
   </tbody>
 </table>
+{{if .Scans}}
+<p class="text-muted" style="margin-top: 4px;">+N opened / &minus;N closed since the previous scan</p>
+{{end}}
 {{template "views/partials/pagination" .Pagination}}

@@ -3,6 +3,7 @@ package importer
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 )
 
 // Factory creates a Source from provider-specific JSON config.
@@ -36,5 +37,6 @@ func (r *Registry) List() []string {
 	for name := range r.factories {
 		names = append(names, name)
 	}
+	slices.Sort(names)
 	return names
 }

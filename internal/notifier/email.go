@@ -31,7 +31,7 @@ func NewEmailFactory(sender mail.Sender) Factory {
 			return nil, fmt.Errorf("invalid email config: %w", err)
 		}
 		if sender == nil {
-			return nil, errors.New("email: SMTP is not configured (set SMTP_HOST)")
+			return nil, errors.New("email notifications need an SMTP server: the server admin must set SMTP_HOST (see README)")
 		}
 		to, err := cleanRecipients(cfg.To)
 		if err != nil {
