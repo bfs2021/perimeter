@@ -166,6 +166,7 @@ var (
 		{Name: "scanned_at", Type: field.TypeTime},
 		{Name: "last_seen_at", Type: field.TypeTime, Nullable: true},
 		{Name: "check_count", Type: field.TypeInt, Default: 0},
+		{Name: "scan_error", Type: field.TypeString, Nullable: true},
 		{Name: "ip_scans", Type: field.TypeInt},
 	}
 	// PortScansTable holds the schema information for the "port_scans" table.
@@ -176,7 +177,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "port_scans_ips_scans",
-				Columns:    []*schema.Column{PortScansColumns[4]},
+				Columns:    []*schema.Column{PortScansColumns[5]},
 				RefColumns: []*schema.Column{IpsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},

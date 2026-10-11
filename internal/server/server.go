@@ -725,14 +725,20 @@ func (s *Server) ipHistoryData(ctx context.Context, c *fiber.Ctx, i *ent.IP) (ip
 }
 
 // diffPortScans annotates each row with the ports gained and lost relative to
-// the row before it. Rows arrive newest first; the trailing lookahead row is
-// dropped after it has been used as a baseline.
+// the next older row that answered the scan. Rows arrive newest first; error
+// rows show no diff and are skipped as baselines, and the trailing lookahead
+// row is dropped after it has been used as a baseline.
 func diffPortScans(items []*ent.PortScan) []portScanView {
 	views := make([]portScanView, 0, len(items))
 	for n, scan := range items {
 		v := portScanView{PortScan: scan}
-		if n+1 < len(items) {
-			v.Added, v.Removed = portDelta(scanPorts(items[n+1]), scanPorts(scan))
+		if scan.ScanError == "" {
+			for m := n + 1; m < len(items); m++ {
+				if items[m].ScanError == "" {
+					v.Added, v.Removed = portDelta(scanPorts(items[m]), scanPorts(scan))
+					break
+				}
+			}
 		}
 		views = append(views, v)
 	}
@@ -1356,6 +1362,7 @@ type exportIP struct {
 type exportPortScan struct {
 	ScannedAt string `json:"scanned_at"`
 	Ports     []int  `json:"ports"`
+	Error     string `json:"error,omitempty"`
 }
 
 type exportSSL struct {
@@ -1388,13 +1395,16 @@ func newExportData(t *ent.Target) exportData {
 	for _, ip := range t.Edges.Ips {
 		eip := exportIP{Address: ip.Address}
 		for _, scan := range ip.Edges.Scans {
-			var ports []int
+			// Ports is always a non-nil slice so an empty successful scan
+			// exports as [], not null.
+			ports := make([]int, 0, len(scan.Edges.Ports))
 			for _, p := range scan.Edges.Ports {
 				ports = append(ports, p.Number)
 			}
 			eip.Scans = append(eip.Scans, exportPortScan{
 				ScannedAt: scan.ScannedAt.Format(time.RFC3339),
 				Ports:     ports,
+				Error:     scan.ScanError,
 			})
 		}
 		data.IPs = append(data.IPs, eip)
@@ -1433,11 +1443,17 @@ func exportCSVRows(d exportData) [][]string {
 	var rows [][]string
 	for _, ip := range d.IPs {
 		for _, scan := range ip.Scans {
-			portStrs := make([]string, len(scan.Ports))
-			for i, p := range scan.Ports {
-				portStrs[i] = strconv.Itoa(p)
+			value := ""
+			if scan.Error != "" {
+				value = scan.Error
+			} else {
+				portStrs := make([]string, len(scan.Ports))
+				for i, p := range scan.Ports {
+					portStrs[i] = strconv.Itoa(p)
+				}
+				value = strings.Join(portStrs, ";")
 			}
-			rows = append(rows, []string{"port_scan", scan.ScannedAt, ip.Address, strings.Join(portStrs, ";")})
+			rows = append(rows, []string{"port_scan", scan.ScannedAt, ip.Address, value})
 		}
 	}
 	for _, scan := range d.SSL {

@@ -21,6 +21,9 @@ func (PortScan) Fields() []ent.Field {
 		// How many scans produced this same result. 0 means "not yet
 		// collapsed"; the startup backfill uses it as its guard.
 		field.Int("check_count").Default(0),
+		// Why the scan got no answer from the host (e.g. host unreachable);
+		// empty for a normal result. Such rows carry no ports.
+		field.String("scan_error").Optional(),
 	}
 }
 

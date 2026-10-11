@@ -9,6 +9,8 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"slices"
+	"sort"
 	"strings"
 	"sync"
 	"syscall"
@@ -24,6 +26,7 @@ import (
 
 type ScannerConfig struct {
 	PortScanInterval   time.Duration
+	PortTimeout        time.Duration
 	SSLScanInterval    time.Duration
 	CSPScanInterval    time.Duration
 	ResolutionInterval time.Duration
@@ -194,7 +197,13 @@ func (m *Manager) runStaleJobRecovery() {
 func (m *Manager) runWorker(ctx context.Context, id int) {
 	log.Printf("Worker %d started", id)
 
-	portScanner := ports.NewSimpleScanner(100, 50, 3, 1, 1000)
+	portTimeout := m.config.PortTimeout
+	if portTimeout == 0 {
+		portTimeout = time.Second
+	}
+	// Retries only cover filtered (timeout) outcomes, so two tries per port
+	// is enough (issue #29).
+	portScanner := ports.NewSimpleScanner(int(portTimeout.Milliseconds()), 50, 2, 1, 1000)
 
 	var sslScanner *ssl.SSLLabsScanner
 	if m.config.SSLEmail != "" {
@@ -398,24 +407,60 @@ func (m *Manager) processPortScan(ctx context.Context, j Job, scanner *ports.Sim
 
 	openPorts, err := scanner.Scan(j.Address)
 	if err != nil {
+		// The host gave no answer at all: store the reason so the dashboard
+		// does not show it as clean, and complete the job normally so the
+		// next round retries it (issue #29).
+		if errors.Is(err, ports.ErrUnreachable) {
+			log.Printf("Worker: IP %s unreachable: %v", j.Address, err)
+			if serr := m.storage.SavePortScanError(ctx, j.Address, err.Error()); serr != nil {
+				log.Printf("Worker: failed to record unreachable for %s: %v", j.Address, serr)
+			}
+			m.completeJob(ctx, j)
+			return
+		}
 		log.Printf("Worker: Failed to scan %s: %v", j.Address, err)
 		m.failJob(ctx, j, err.Error())
 		return
 	}
 
-	err = m.storage.SavePortScan(ctx, j.Address, openPorts)
+	// Flap confirmation: a port that appeared or disappeared against the
+	// previous scan is re-probed before it is saved, so a single dropped
+	// probe cannot create a diff (issue #29).
+	final := openPorts
+	if len(prevPorts) > 0 {
+		var added, removed []int
+		for _, p := range openPorts {
+			if !prevSet[p] {
+				added = append(added, p)
+			}
+		}
+		for _, p := range prevPorts {
+			if !slices.Contains(openPorts, p) {
+				removed = append(removed, p)
+			}
+		}
+		if len(added) > 0 || len(removed) > 0 {
+			confirmed := scanner.Confirm(j.Address, slices.Concat(added, removed))
+			final = mergeConfirmed(openPorts, prevPorts, confirmed)
+			if !slices.Equal(final, openPorts) {
+				log.Printf("Worker: Confirmation changed %s: scan %v, confirmed %v", j.Address, openPorts, final)
+			}
+		}
+	}
+
+	err = m.storage.SavePortScan(ctx, j.Address, final)
 	if err != nil {
 		log.Printf("Worker: Failed to save results for %s: %v", j.Address, err)
 		m.failJob(ctx, j, err.Error())
 		return
 	}
 
-	log.Printf("Worker: Saved %d ports for %s", len(openPorts), j.Address)
+	log.Printf("Worker: Saved %d ports for %s", len(final), j.Address)
 	m.completeJob(ctx, j)
 
 	// Check for new open ports
 	var newPorts []int
-	for _, p := range openPorts {
+	for _, p := range final {
 		if !prevSet[p] {
 			newPorts = append(newPorts, p)
 		}
@@ -429,10 +474,46 @@ func (m *Manager) processPortScan(ctx context.Context, j Job, scanner *ports.Sim
 			Type:      notifier.EventNewOpenPorts,
 			Target:    j.Address,
 			Message:   fmt.Sprintf("New open ports detected on %s: %s", j.Address, strings.Join(portStrs, ", ")),
-			Details:   map[string]any{"new_ports": newPorts, "all_ports": openPorts},
+			Details:   map[string]any{"new_ports": newPorts, "all_ports": final},
 			Timestamp: time.Now(),
 		})
 	}
+}
+
+// mergeConfirmed folds a flap confirmation into the scan result: unchanged
+// ports keep their place, gained ports stay only when the confirmation
+// proved them, and lost ports come back only when the confirmation still
+// found them open. The sorted result is what gets saved (issue #29).
+func mergeConfirmed(scanned, prev, confirmed []int) []int {
+	prevSet := make(map[int]bool, len(prev))
+	for _, p := range prev {
+		prevSet[p] = true
+	}
+	confirmedSet := make(map[int]bool, len(confirmed))
+	for _, p := range confirmed {
+		confirmedSet[p] = true
+	}
+	scannedSet := make(map[int]bool, len(scanned))
+	for _, p := range scanned {
+		scannedSet[p] = true
+	}
+
+	final := make([]int, 0, len(scanned))
+	for _, p := range scanned {
+		// Unchanged ports keep their place; gained ports need the
+		// confirmation to prove they really changed.
+		if prevSet[p] || confirmedSet[p] {
+			final = append(final, p)
+		}
+	}
+	for _, p := range prev {
+		// Lost ports come back only when the confirmation still sees them.
+		if !scannedSet[p] && confirmedSet[p] {
+			final = append(final, p)
+		}
+	}
+	sort.Ints(final)
+	return final
 }
 
 func (m *Manager) processSSLScan(ctx context.Context, j Job, scanner *ssl.SSLLabsScanner) {

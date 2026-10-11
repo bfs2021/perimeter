@@ -13,12 +13,14 @@
         {{if not .LastSeenAt.IsZero}}<div><small>last checked {{.LastSeenAt.Format "Jan 02 15:04"}} &middot; {{.CheckCount}} checks</small></div>{{end}}
       </td>
       <td>
-        {{if .Edges.Ports}}
+        {{if .ScanError}}
+        <span class="badge badge-gray">unreachable</span> <span class="text-muted">{{.ScanError}}</span>
+        {{else if .Edges.Ports}}
         {{range .Edges.Ports}}<span class="badge badge-red">{{.Number}}</span> {{end}}
         {{else}}
         <span class="badge badge-green">none</span>
         {{end}}
-        {{if or .Added .Removed}}
+        {{if and (not .ScanError) (or .Added .Removed)}}
         <div><small class="text-muted">{{range .Added}}+{{.}} {{end}}{{range .Removed}}&minus;{{.}} {{end}}</small></div>
         {{end}}
       </td>

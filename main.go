@@ -71,6 +71,7 @@ var (
 	workerCount  = getEnvOrDefaultInt("WORKER_COUNT", 3)
 
 	portInterval = getEnvOrDefaultDuration("PORT_INTERVAL", 1*time.Hour)
+	portTimeout  = getEnvOrDefaultDuration("PORT_TIMEOUT", 1*time.Second)
 	sslInterval  = getEnvOrDefaultDuration("SSL_INTERVAL", 12*time.Hour)
 	cspInterval  = getEnvOrDefaultDuration("CSP_INTERVAL", 1*time.Hour)
 
@@ -101,6 +102,7 @@ func main() {
 
 	// Scanning intervals
 	flag.DurationVar(&portInterval, "portInterval", portInterval, "Interval for port scans")
+	flag.DurationVar(&portTimeout, "portTimeout", portTimeout, "Timeout for a single port probe")
 	flag.DurationVar(&sslInterval, "sslInterval", sslInterval, "Interval for SSL scans")
 	flag.DurationVar(&cspInterval, "cspInterval", cspInterval, "Interval for CSP scans")
 
@@ -228,6 +230,7 @@ func main() {
 	// 6. Start Scanners
 	scanConfig := scanner.ScannerConfig{
 		PortScanInterval: portInterval,
+		PortTimeout:      portTimeout,
 		SSLScanInterval:  sslInterval,
 		CSPScanInterval:  cspInterval,
 		SSLEmail:         email,

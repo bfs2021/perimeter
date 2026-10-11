@@ -5484,6 +5484,7 @@ type PortScanMutation struct {
 	last_seen_at   *time.Time
 	check_count    *int
 	addcheck_count *int
+	scan_error     *string
 	clearedFields  map[string]struct{}
 	ip             *int
 	clearedip      bool
@@ -5734,6 +5735,55 @@ func (m *PortScanMutation) ResetCheckCount() {
 	m.addcheck_count = nil
 }
 
+// SetScanError sets the "scan_error" field.
+func (m *PortScanMutation) SetScanError(s string) {
+	m.scan_error = &s
+}
+
+// ScanError returns the value of the "scan_error" field in the mutation.
+func (m *PortScanMutation) ScanError() (r string, exists bool) {
+	v := m.scan_error
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldScanError returns the old "scan_error" field's value of the PortScan entity.
+// If the PortScan object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PortScanMutation) OldScanError(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldScanError is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldScanError requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldScanError: %w", err)
+	}
+	return oldValue.ScanError, nil
+}
+
+// ClearScanError clears the value of the "scan_error" field.
+func (m *PortScanMutation) ClearScanError() {
+	m.scan_error = nil
+	m.clearedFields[portscan.FieldScanError] = struct{}{}
+}
+
+// ScanErrorCleared returns if the "scan_error" field was cleared in this mutation.
+func (m *PortScanMutation) ScanErrorCleared() bool {
+	_, ok := m.clearedFields[portscan.FieldScanError]
+	return ok
+}
+
+// ResetScanError resets all changes to the "scan_error" field.
+func (m *PortScanMutation) ResetScanError() {
+	m.scan_error = nil
+	delete(m.clearedFields, portscan.FieldScanError)
+}
+
 // SetIPID sets the "ip" edge to the IP entity by id.
 func (m *PortScanMutation) SetIPID(id int) {
 	m.ip = &id
@@ -5861,7 +5911,7 @@ func (m *PortScanMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PortScanMutation) Fields() []string {
-	fields := make([]string, 0, 3)
+	fields := make([]string, 0, 4)
 	if m.scanned_at != nil {
 		fields = append(fields, portscan.FieldScannedAt)
 	}
@@ -5870,6 +5920,9 @@ func (m *PortScanMutation) Fields() []string {
 	}
 	if m.check_count != nil {
 		fields = append(fields, portscan.FieldCheckCount)
+	}
+	if m.scan_error != nil {
+		fields = append(fields, portscan.FieldScanError)
 	}
 	return fields
 }
@@ -5885,6 +5938,8 @@ func (m *PortScanMutation) Field(name string) (ent.Value, bool) {
 		return m.LastSeenAt()
 	case portscan.FieldCheckCount:
 		return m.CheckCount()
+	case portscan.FieldScanError:
+		return m.ScanError()
 	}
 	return nil, false
 }
@@ -5900,6 +5955,8 @@ func (m *PortScanMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldLastSeenAt(ctx)
 	case portscan.FieldCheckCount:
 		return m.OldCheckCount(ctx)
+	case portscan.FieldScanError:
+		return m.OldScanError(ctx)
 	}
 	return nil, fmt.Errorf("unknown PortScan field %s", name)
 }
@@ -5929,6 +5986,13 @@ func (m *PortScanMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCheckCount(v)
+		return nil
+	case portscan.FieldScanError:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetScanError(v)
 		return nil
 	}
 	return fmt.Errorf("unknown PortScan field %s", name)
@@ -5978,6 +6042,9 @@ func (m *PortScanMutation) ClearedFields() []string {
 	if m.FieldCleared(portscan.FieldLastSeenAt) {
 		fields = append(fields, portscan.FieldLastSeenAt)
 	}
+	if m.FieldCleared(portscan.FieldScanError) {
+		fields = append(fields, portscan.FieldScanError)
+	}
 	return fields
 }
 
@@ -5995,6 +6062,9 @@ func (m *PortScanMutation) ClearField(name string) error {
 	case portscan.FieldLastSeenAt:
 		m.ClearLastSeenAt()
 		return nil
+	case portscan.FieldScanError:
+		m.ClearScanError()
+		return nil
 	}
 	return fmt.Errorf("unknown PortScan nullable field %s", name)
 }
@@ -6011,6 +6081,9 @@ func (m *PortScanMutation) ResetField(name string) error {
 		return nil
 	case portscan.FieldCheckCount:
 		m.ResetCheckCount()
+		return nil
+	case portscan.FieldScanError:
+		m.ResetScanError()
 		return nil
 	}
 	return fmt.Errorf("unknown PortScan field %s", name)

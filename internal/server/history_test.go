@@ -1,7 +1,10 @@
 package server
 
 import (
+	"bytes"
+	"os"
 	"slices"
+	"strings"
 	"testing"
 
 	"perimeter/ent"
@@ -13,6 +16,36 @@ func portScanWith(numbers ...int) *ent.PortScan {
 		scan.Edges.Ports = append(scan.Edges.Ports, &ent.Port{Number: n})
 	}
 	return scan
+}
+
+// The target page is the only caller of the partial, and no handler test
+// reaches it, so render it directly: an error row must show the unreachable
+// badge and no diff, the normal row its ports.
+func TestIpSectionRendersScanError(t *testing.T) {
+	engine := newViewEngine(os.DirFS("../.."))
+	data := ipScanRow{
+		IP: &ent.IP{},
+		Scans: []portScanView{
+			{PortScan: &ent.PortScan{CheckCount: 2, ScanError: "host unreachable: no route to host"}},
+			{PortScan: portScanWith(80)},
+		},
+		Pagination: pagination{Page: 1, TotalPages: 1},
+	}
+
+	var buf bytes.Buffer
+	if err := engine.Render(&buf, "views/partials/ip_section", data); err != nil {
+		t.Fatalf("render ip_section: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, `<span class="badge badge-gray">unreachable</span>`) {
+		t.Errorf("missing unreachable badge:\n%s", out)
+	}
+	if !strings.Contains(out, "host unreachable: no route to host") {
+		t.Errorf("missing error text:\n%s", out)
+	}
+	if !strings.Contains(out, `<span class="badge badge-red">80</span>`) {
+		t.Errorf("missing port badge:\n%s", out)
+	}
 }
 
 func TestPortDelta(t *testing.T) {
@@ -27,6 +60,39 @@ func TestPortDelta(t *testing.T) {
 	added, removed = portDelta([]int{80}, []int{80})
 	if len(added) != 0 || len(removed) != 0 {
 		t.Errorf("unchanged set produced %v / %v", added, removed)
+	}
+}
+
+func TestDiffPortScansSkipsErrorRows(t *testing.T) {
+	// Newest first: error row, answered row, error row, answered row.
+	items := []*ent.PortScan{
+		{ScanError: "host unreachable"},
+		portScanWith(80, 443),
+		{ScanError: "host unreachable"},
+		portScanWith(80),
+	}
+
+	views := diffPortScans(items)
+	if len(views) != 4 {
+		t.Fatalf("got %d rows, want 4", len(views))
+	}
+	// Error rows show no diff at all.
+	for _, idx := range []int{0, 2} {
+		if len(views[idx].Added) != 0 || len(views[idx].Removed) != 0 {
+			t.Errorf("error row %d got a diff: %v / %v", idx, views[idx].Added, views[idx].Removed)
+		}
+	}
+	// The answered row diffs against the next older answered row, skipping
+	// the error row in between.
+	if !slices.Equal(views[1].Added, []int{443}) {
+		t.Errorf("row 1: added %v, want [443]", views[1].Added)
+	}
+	if len(views[1].Removed) != 0 {
+		t.Errorf("row 1: removed %v, want none", views[1].Removed)
+	}
+	// The oldest row has no baseline.
+	if len(views[3].Added) != 0 || len(views[3].Removed) != 0 {
+		t.Errorf("oldest row got a diff: %v / %v", views[3].Added, views[3].Removed)
 	}
 }
 

@@ -84,6 +84,10 @@ type Storage interface {
 	// Saving Results
 	SaveIPs(ctx context.Context, targetInput string, ipAddresses []string) error
 	SavePortScan(ctx context.Context, ipAddress string, openPorts []int) error
+	// SavePortScanError records a port scan that got no answer from the host
+	// (issue #29): a scan row with no ports and scan_error set to msg, so the
+	// dashboard shows the host as unreachable instead of clean.
+	SavePortScanError(ctx context.Context, ipAddress string, msg string) error
 	SaveSSLScan(ctx context.Context, input string, result SSLResult) error
 	SaveCSPScan(ctx context.Context, input string, header string, findings []csp.Finding) error
 	SaveCSPUnreachable(ctx context.Context, input string, probeErr string) error
@@ -465,19 +469,69 @@ func (s *EntStorage) savePortScan(ctx context.Context, i *ent.IP, openPorts []in
 	if err != nil && !ent.IsNotFound(err) {
 		return err
 	}
-	if latest != nil && samePorts(scanPorts(latest), openPorts) {
+	// A normal result never collapses into an error row: the host came
+	// back, so the error period is over.
+	if latest != nil && latest.ScanError == "" && samePorts(scanPorts(latest), openPorts) {
 		return s.client.PortScan.UpdateOne(latest).
 			SetLastSeenAt(now).
 			AddCheckCount(1).
 			Exec(ctx)
 	}
 
-	scan, err := s.client.PortScan.Create().
+	return s.createPortScanRow(ctx, i, now, openPorts, "")
+}
+
+// SavePortScanError records a port scan that got no answer from the host
+// (issue #29): a scan row with no ports and scan_error set to msg, so the
+// dashboard shows the host as unreachable instead of clean. Repeated
+// identical errors collapse onto the current row, like savePortScan does.
+func (s *EntStorage) SavePortScanError(ctx context.Context, ipAddress, msg string) error {
+	i, err := s.client.IP.Query().Where(ip.Address(ipAddress)).First(ctx)
+	if err != nil {
+		return err
+	}
+
+	if err := s.savePortScanError(ctx, i, msg); err != nil {
+		return err
+	}
+	return refreshSummary(ctx, s.client, target.HasIpsWith(ip.ID(i.ID)))
+}
+
+func (s *EntStorage) savePortScanError(ctx context.Context, i *ent.IP, msg string) error {
+	now := time.Now()
+
+	latest, err := s.client.PortScan.Query().
+		Where(portscan.HasIPWith(ip.IDEQ(i.ID))).
+		Order(ent.Desc(portscan.FieldScannedAt), ent.Desc(portscan.FieldID)).
+		WithPorts().
+		First(ctx)
+	if err != nil && !ent.IsNotFound(err) {
+		return err
+	}
+	// Only identical error rows collapse; a port change or a recovered
+	// result starts a new row.
+	if latest != nil && latest.ScanError == msg && len(scanPorts(latest)) == 0 {
+		return s.client.PortScan.UpdateOne(latest).
+			SetLastSeenAt(now).
+			AddCheckCount(1).
+			Exec(ctx)
+	}
+
+	return s.createPortScanRow(ctx, i, now, nil, msg)
+}
+
+// createPortScanRow inserts a scan row with the given ports (empty for error
+// rows) and scan_error (left empty for normal results).
+func (s *EntStorage) createPortScanRow(ctx context.Context, i *ent.IP, now time.Time, openPorts []int, scanErr string) error {
+	b := s.client.PortScan.Create().
 		SetIP(i).
 		SetScannedAt(now).
 		SetLastSeenAt(now).
-		SetCheckCount(1).
-		Save(ctx)
+		SetCheckCount(1)
+	if scanErr != "" {
+		b = b.SetScanError(scanErr)
+	}
+	scan, err := b.Save(ctx)
 	if err != nil {
 		return err
 	}
@@ -605,7 +659,10 @@ func (s *EntStorage) saveCSP(ctx context.Context, input, header string, findings
 	return tx.Commit()
 }
 
-// GetPreviousPortCounts returns the set of open ports from the most recent scan for an IP.
+// GetPreviousPortCounts returns the set of open ports from the most recent
+// scan for an IP that answered. Error rows are ignored (issue #29), so a host
+// that came back after being unreachable is diffed against its last real
+// result, not against "nothing".
 func (s *EntStorage) GetPreviousPortCounts(ctx context.Context, ipAddress string) ([]int, error) {
 	i, err := s.client.IP.Query().Where(ip.Address(ipAddress)).First(ctx)
 	if err != nil {
@@ -614,6 +671,7 @@ func (s *EntStorage) GetPreviousPortCounts(ctx context.Context, ipAddress string
 
 	scan, err := s.client.PortScan.Query().
 		Where(portscan.HasIPWith(ip.IDEQ(i.ID))).
+		Where(portscan.Or(portscan.ScanErrorIsNil(), portscan.ScanError(""))).
 		Order(ent.Desc(portscan.FieldScannedAt)).
 		WithPorts().
 		First(ctx)

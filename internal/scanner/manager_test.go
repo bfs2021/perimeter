@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"slices"
 	"sync"
 	"syscall"
 	"testing"
@@ -195,6 +196,30 @@ func TestEnqueueSkipsInFlightDuplicate(t *testing.T) {
 	}
 	if m.enqueue(ctx, Job{Type: JobTypeCSPScan, Input: "example.com"}) {
 		t.Error("duplicate job was queued while the first is still in flight")
+	}
+}
+
+func TestMergeConfirmed(t *testing.T) {
+	cases := []struct {
+		name      string
+		scanned   []int
+		prev      []int
+		confirmed []int
+		want      []int
+	}{
+		{"no change", []int{80}, []int{80}, nil, []int{80}},
+		{"added and confirmed", []int{80, 443}, []int{80}, []int{443}, []int{80, 443}},
+		{"added but not confirmed", []int{80, 443}, []int{80}, nil, []int{80}},
+		{"removed but confirmed still open", []int{80}, []int{80, 443}, []int{443}, []int{80, 443}},
+		{"removed and not confirmed", []int{80}, []int{80, 443}, nil, []int{80}},
+		{"mixed", []int{22, 80, 3306}, []int{22, 80, 8080}, []int{3306, 8080}, []int{22, 80, 3306, 8080}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := mergeConfirmed(tc.scanned, tc.prev, tc.confirmed); !slices.Equal(got, tc.want) {
+				t.Errorf("mergeConfirmed(%v, %v, %v) = %v, want %v", tc.scanned, tc.prev, tc.confirmed, got, tc.want)
+			}
+		})
 	}
 }
 

@@ -24,6 +24,8 @@ type PortScan struct {
 	LastSeenAt time.Time `json:"last_seen_at,omitempty"`
 	// CheckCount holds the value of the "check_count" field.
 	CheckCount int `json:"check_count,omitempty"`
+	// ScanError holds the value of the "scan_error" field.
+	ScanError string `json:"scan_error,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the PortScanQuery when eager-loading is set.
 	Edges        PortScanEdges `json:"edges"`
@@ -69,6 +71,8 @@ func (*PortScan) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case portscan.FieldID, portscan.FieldCheckCount:
 			values[i] = new(sql.NullInt64)
+		case portscan.FieldScanError:
+			values[i] = new(sql.NullString)
 		case portscan.FieldScannedAt, portscan.FieldLastSeenAt:
 			values[i] = new(sql.NullTime)
 		case portscan.ForeignKeys[0]: // ip_scans
@@ -111,6 +115,12 @@ func (_m *PortScan) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field check_count", values[i])
 			} else if value.Valid {
 				_m.CheckCount = int(value.Int64)
+			}
+		case portscan.FieldScanError:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field scan_error", values[i])
+			} else if value.Valid {
+				_m.ScanError = value.String
 			}
 		case portscan.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -173,6 +183,9 @@ func (_m *PortScan) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("check_count=")
 	builder.WriteString(fmt.Sprintf("%v", _m.CheckCount))
+	builder.WriteString(", ")
+	builder.WriteString("scan_error=")
+	builder.WriteString(_m.ScanError)
 	builder.WriteByte(')')
 	return builder.String()
 }
