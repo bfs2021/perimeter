@@ -118,6 +118,9 @@ func (s *Server) Listen(addr string) error {
 }
 
 func (s *Server) setupRoutes() {
+	// Security headers on every response, before anything else.
+	s.app.Use(securityHeaders())
+
 	// Before every route, public ones included: login and setup forms are
 	// CSRF targets too.
 	s.app.Use(crossOriginProtection())
@@ -331,6 +334,9 @@ func (s *Server) handleOIDCLogin(c *fiber.Ctx) error {
 		Value:    state,
 		HTTPOnly: true,
 		MaxAge:   300,
+		// Only over a TLS connection; c.Protocol() honours X-Forwarded-Proto
+		// behind a reverse proxy.
+		Secure: c.Protocol() == "https",
 	})
 	return c.Redirect(s.auth.OIDCAuthURL(state))
 }
@@ -370,6 +376,9 @@ func (s *Server) createSessionAndRedirect(c *fiber.Ctx, u *ent.User) error {
 		HTTPOnly: true,
 		Path:     "/",
 		MaxAge:   30 * 24 * 60 * 60, // 30 days
+		// Only over a TLS connection; c.Protocol() honours X-Forwarded-Proto
+		// behind a reverse proxy.
+		Secure: c.Protocol() == "https",
 	})
 
 	return c.Redirect("/")
