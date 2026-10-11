@@ -19,7 +19,7 @@
         {{else if .Findings}}
         {{range .Findings}}
         <div style="margin-bottom: 4px;">
-          {{if ge .Severity 40}}<span class="badge badge-red">high</span>{{else}}<span class="badge badge-gray">info</span>{{end}}
+          {{if eq .Severity.Level "high"}}<span class="badge badge-red">high</span>{{else if eq .Severity.Level "medium"}}<span class="badge badge-amber">medium</span>{{else if eq .Severity.Level "low"}}<span class="badge badge-blue">low</span>{{else}}<span class="badge badge-gray">info</span>{{end}}
           <strong>{{.Directive}}</strong> {{.Description}}
         </div>
         {{end}}
