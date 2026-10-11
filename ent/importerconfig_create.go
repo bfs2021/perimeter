@@ -88,6 +88,48 @@ func (_c *ImporterConfigCreate) SetNillableLastSyncAt(v *time.Time) *ImporterCon
 	return _c
 }
 
+// SetLastAttemptAt sets the "last_attempt_at" field.
+func (_c *ImporterConfigCreate) SetLastAttemptAt(v time.Time) *ImporterConfigCreate {
+	_c.mutation.SetLastAttemptAt(v)
+	return _c
+}
+
+// SetNillableLastAttemptAt sets the "last_attempt_at" field if the given value is not nil.
+func (_c *ImporterConfigCreate) SetNillableLastAttemptAt(v *time.Time) *ImporterConfigCreate {
+	if v != nil {
+		_c.SetLastAttemptAt(*v)
+	}
+	return _c
+}
+
+// SetLastError sets the "last_error" field.
+func (_c *ImporterConfigCreate) SetLastError(v string) *ImporterConfigCreate {
+	_c.mutation.SetLastError(v)
+	return _c
+}
+
+// SetNillableLastError sets the "last_error" field if the given value is not nil.
+func (_c *ImporterConfigCreate) SetNillableLastError(v *string) *ImporterConfigCreate {
+	if v != nil {
+		_c.SetLastError(*v)
+	}
+	return _c
+}
+
+// SetConsecutiveFailures sets the "consecutive_failures" field.
+func (_c *ImporterConfigCreate) SetConsecutiveFailures(v int) *ImporterConfigCreate {
+	_c.mutation.SetConsecutiveFailures(v)
+	return _c
+}
+
+// SetNillableConsecutiveFailures sets the "consecutive_failures" field if the given value is not nil.
+func (_c *ImporterConfigCreate) SetNillableConsecutiveFailures(v *int) *ImporterConfigCreate {
+	if v != nil {
+		_c.SetConsecutiveFailures(*v)
+	}
+	return _c
+}
+
 // SetEnabled sets the "enabled" field.
 func (_c *ImporterConfigCreate) SetEnabled(v bool) *ImporterConfigCreate {
 	_c.mutation.SetEnabled(v)
@@ -149,6 +191,10 @@ func (_c *ImporterConfigCreate) defaults() {
 		v := importerconfig.DefaultSyncIntervalSeconds
 		_c.mutation.SetSyncIntervalSeconds(v)
 	}
+	if _, ok := _c.mutation.ConsecutiveFailures(); !ok {
+		v := importerconfig.DefaultConsecutiveFailures
+		_c.mutation.SetConsecutiveFailures(v)
+	}
 	if _, ok := _c.mutation.Enabled(); !ok {
 		v := importerconfig.DefaultEnabled
 		_c.mutation.SetEnabled(v)
@@ -176,6 +222,9 @@ func (_c *ImporterConfigCreate) check() error {
 	}
 	if _, ok := _c.mutation.SyncIntervalSeconds(); !ok {
 		return &ValidationError{Name: "sync_interval_seconds", err: errors.New(`ent: missing required field "ImporterConfig.sync_interval_seconds"`)}
+	}
+	if _, ok := _c.mutation.ConsecutiveFailures(); !ok {
+		return &ValidationError{Name: "consecutive_failures", err: errors.New(`ent: missing required field "ImporterConfig.consecutive_failures"`)}
 	}
 	if _, ok := _c.mutation.Enabled(); !ok {
 		return &ValidationError{Name: "enabled", err: errors.New(`ent: missing required field "ImporterConfig.enabled"`)}
@@ -229,6 +278,18 @@ func (_c *ImporterConfigCreate) createSpec() (*ImporterConfig, *sqlgraph.CreateS
 	if value, ok := _c.mutation.LastSyncAt(); ok {
 		_spec.SetField(importerconfig.FieldLastSyncAt, field.TypeTime, value)
 		_node.LastSyncAt = &value
+	}
+	if value, ok := _c.mutation.LastAttemptAt(); ok {
+		_spec.SetField(importerconfig.FieldLastAttemptAt, field.TypeTime, value)
+		_node.LastAttemptAt = &value
+	}
+	if value, ok := _c.mutation.LastError(); ok {
+		_spec.SetField(importerconfig.FieldLastError, field.TypeString, value)
+		_node.LastError = value
+	}
+	if value, ok := _c.mutation.ConsecutiveFailures(); ok {
+		_spec.SetField(importerconfig.FieldConsecutiveFailures, field.TypeInt, value)
+		_node.ConsecutiveFailures = value
 	}
 	if value, ok := _c.mutation.Enabled(); ok {
 		_spec.SetField(importerconfig.FieldEnabled, field.TypeBool, value)

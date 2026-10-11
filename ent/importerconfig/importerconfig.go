@@ -26,6 +26,12 @@ const (
 	FieldSyncIntervalSeconds = "sync_interval_seconds"
 	// FieldLastSyncAt holds the string denoting the last_sync_at field in the database.
 	FieldLastSyncAt = "last_sync_at"
+	// FieldLastAttemptAt holds the string denoting the last_attempt_at field in the database.
+	FieldLastAttemptAt = "last_attempt_at"
+	// FieldLastError holds the string denoting the last_error field in the database.
+	FieldLastError = "last_error"
+	// FieldConsecutiveFailures holds the string denoting the consecutive_failures field in the database.
+	FieldConsecutiveFailures = "consecutive_failures"
 	// FieldEnabled holds the string denoting the enabled field in the database.
 	FieldEnabled = "enabled"
 	// Table holds the table name of the importerconfig in the database.
@@ -41,6 +47,9 @@ var Columns = []string{
 	FieldCredentials,
 	FieldSyncIntervalSeconds,
 	FieldLastSyncAt,
+	FieldLastAttemptAt,
+	FieldLastError,
+	FieldConsecutiveFailures,
 	FieldEnabled,
 }
 
@@ -63,6 +72,8 @@ var (
 	UpdateDefaultUpdateTime func() time.Time
 	// DefaultSyncIntervalSeconds holds the default value on creation for the "sync_interval_seconds" field.
 	DefaultSyncIntervalSeconds int64
+	// DefaultConsecutiveFailures holds the default value on creation for the "consecutive_failures" field.
+	DefaultConsecutiveFailures int
 	// DefaultEnabled holds the default value on creation for the "enabled" field.
 	DefaultEnabled bool
 )
@@ -125,6 +136,21 @@ func BySyncIntervalSeconds(opts ...sql.OrderTermOption) OrderOption {
 // ByLastSyncAt orders the results by the last_sync_at field.
 func ByLastSyncAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldLastSyncAt, opts...).ToFunc()
+}
+
+// ByLastAttemptAt orders the results by the last_attempt_at field.
+func ByLastAttemptAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldLastAttemptAt, opts...).ToFunc()
+}
+
+// ByLastError orders the results by the last_error field.
+func ByLastError(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldLastError, opts...).ToFunc()
+}
+
+// ByConsecutiveFailures orders the results by the consecutive_failures field.
+func ByConsecutiveFailures(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldConsecutiveFailures, opts...).ToFunc()
 }
 
 // ByEnabled orders the results by the enabled field.

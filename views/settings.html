@@ -6,6 +6,10 @@
 <div class="alert alert-error">{{.Error}}</div>
 {{end}}
 
+{{if .Success}}
+<div class="alert alert-success">{{.Success}}</div>
+{{end}}
+
 {{if .InviteLink}}
 <div class="alert alert-success">
   <strong>Invite created for {{.InviteEmail}}</strong><br>
@@ -68,7 +72,7 @@
 </table>
 
 <!-- Importers -->
-<h2>Importers</h2>
+<h2 id="importers">Importers</h2>
 <table>
   <thead>
     <tr>
@@ -88,8 +92,17 @@
         {{else}}<span class="badge badge-gray">disabled</span>{{end}}
       </td>
       <td class="text-muted">{{.SyncIntervalSeconds}}s</td>
-      <td class="text-muted">{{if .LastSyncAt}}{{.LastSyncAt.Format "2006-01-02 15:04"}}{{else}}never{{end}}</td>
+      <td class="text-muted">
+        {{if .LastSyncAt}}{{.LastSyncAt.Format "2006-01-02 15:04"}}{{else}}never{{end}}
+        {{if .LastError}}
+        <div><span class="badge badge-red">failing</span> <small class="text-muted">{{.LastError}}</small></div>
+        {{if .LastAttemptAt}}<small class="text-muted">last attempt {{.LastAttemptAt.Format "2006-01-02 15:04"}}, {{.ConsecutiveFailures}} failures in a row</small>{{end}}
+        {{end}}
+      </td>
       <td>
+        <form method="POST" action="/importers/{{.ID}}/sync" style="display:inline;">
+          <button type="submit">Sync now</button>
+        </form>
         <form method="POST" action="/importers/{{.ID}}/toggle" style="display:inline;">
           <button type="submit">{{if .Enabled}}Disable{{else}}Enable{{end}}</button>
         </form>

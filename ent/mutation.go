@@ -1833,6 +1833,10 @@ type ImporterConfigMutation struct {
 	sync_interval_seconds    *int64
 	addsync_interval_seconds *int64
 	last_sync_at             *time.Time
+	last_attempt_at          *time.Time
+	last_error               *string
+	consecutive_failures     *int
+	addconsecutive_failures  *int
 	enabled                  *bool
 	clearedFields            map[string]struct{}
 	done                     bool
@@ -2187,6 +2191,160 @@ func (m *ImporterConfigMutation) ResetLastSyncAt() {
 	delete(m.clearedFields, importerconfig.FieldLastSyncAt)
 }
 
+// SetLastAttemptAt sets the "last_attempt_at" field.
+func (m *ImporterConfigMutation) SetLastAttemptAt(t time.Time) {
+	m.last_attempt_at = &t
+}
+
+// LastAttemptAt returns the value of the "last_attempt_at" field in the mutation.
+func (m *ImporterConfigMutation) LastAttemptAt() (r time.Time, exists bool) {
+	v := m.last_attempt_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastAttemptAt returns the old "last_attempt_at" field's value of the ImporterConfig entity.
+// If the ImporterConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ImporterConfigMutation) OldLastAttemptAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastAttemptAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastAttemptAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastAttemptAt: %w", err)
+	}
+	return oldValue.LastAttemptAt, nil
+}
+
+// ClearLastAttemptAt clears the value of the "last_attempt_at" field.
+func (m *ImporterConfigMutation) ClearLastAttemptAt() {
+	m.last_attempt_at = nil
+	m.clearedFields[importerconfig.FieldLastAttemptAt] = struct{}{}
+}
+
+// LastAttemptAtCleared returns if the "last_attempt_at" field was cleared in this mutation.
+func (m *ImporterConfigMutation) LastAttemptAtCleared() bool {
+	_, ok := m.clearedFields[importerconfig.FieldLastAttemptAt]
+	return ok
+}
+
+// ResetLastAttemptAt resets all changes to the "last_attempt_at" field.
+func (m *ImporterConfigMutation) ResetLastAttemptAt() {
+	m.last_attempt_at = nil
+	delete(m.clearedFields, importerconfig.FieldLastAttemptAt)
+}
+
+// SetLastError sets the "last_error" field.
+func (m *ImporterConfigMutation) SetLastError(s string) {
+	m.last_error = &s
+}
+
+// LastError returns the value of the "last_error" field in the mutation.
+func (m *ImporterConfigMutation) LastError() (r string, exists bool) {
+	v := m.last_error
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastError returns the old "last_error" field's value of the ImporterConfig entity.
+// If the ImporterConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ImporterConfigMutation) OldLastError(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastError is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastError requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastError: %w", err)
+	}
+	return oldValue.LastError, nil
+}
+
+// ClearLastError clears the value of the "last_error" field.
+func (m *ImporterConfigMutation) ClearLastError() {
+	m.last_error = nil
+	m.clearedFields[importerconfig.FieldLastError] = struct{}{}
+}
+
+// LastErrorCleared returns if the "last_error" field was cleared in this mutation.
+func (m *ImporterConfigMutation) LastErrorCleared() bool {
+	_, ok := m.clearedFields[importerconfig.FieldLastError]
+	return ok
+}
+
+// ResetLastError resets all changes to the "last_error" field.
+func (m *ImporterConfigMutation) ResetLastError() {
+	m.last_error = nil
+	delete(m.clearedFields, importerconfig.FieldLastError)
+}
+
+// SetConsecutiveFailures sets the "consecutive_failures" field.
+func (m *ImporterConfigMutation) SetConsecutiveFailures(i int) {
+	m.consecutive_failures = &i
+	m.addconsecutive_failures = nil
+}
+
+// ConsecutiveFailures returns the value of the "consecutive_failures" field in the mutation.
+func (m *ImporterConfigMutation) ConsecutiveFailures() (r int, exists bool) {
+	v := m.consecutive_failures
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldConsecutiveFailures returns the old "consecutive_failures" field's value of the ImporterConfig entity.
+// If the ImporterConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ImporterConfigMutation) OldConsecutiveFailures(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldConsecutiveFailures is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldConsecutiveFailures requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldConsecutiveFailures: %w", err)
+	}
+	return oldValue.ConsecutiveFailures, nil
+}
+
+// AddConsecutiveFailures adds i to the "consecutive_failures" field.
+func (m *ImporterConfigMutation) AddConsecutiveFailures(i int) {
+	if m.addconsecutive_failures != nil {
+		*m.addconsecutive_failures += i
+	} else {
+		m.addconsecutive_failures = &i
+	}
+}
+
+// AddedConsecutiveFailures returns the value that was added to the "consecutive_failures" field in this mutation.
+func (m *ImporterConfigMutation) AddedConsecutiveFailures() (r int, exists bool) {
+	v := m.addconsecutive_failures
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetConsecutiveFailures resets all changes to the "consecutive_failures" field.
+func (m *ImporterConfigMutation) ResetConsecutiveFailures() {
+	m.consecutive_failures = nil
+	m.addconsecutive_failures = nil
+}
+
 // SetEnabled sets the "enabled" field.
 func (m *ImporterConfigMutation) SetEnabled(b bool) {
 	m.enabled = &b
@@ -2257,7 +2415,7 @@ func (m *ImporterConfigMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ImporterConfigMutation) Fields() []string {
-	fields := make([]string, 0, 7)
+	fields := make([]string, 0, 10)
 	if m.create_time != nil {
 		fields = append(fields, importerconfig.FieldCreateTime)
 	}
@@ -2275,6 +2433,15 @@ func (m *ImporterConfigMutation) Fields() []string {
 	}
 	if m.last_sync_at != nil {
 		fields = append(fields, importerconfig.FieldLastSyncAt)
+	}
+	if m.last_attempt_at != nil {
+		fields = append(fields, importerconfig.FieldLastAttemptAt)
+	}
+	if m.last_error != nil {
+		fields = append(fields, importerconfig.FieldLastError)
+	}
+	if m.consecutive_failures != nil {
+		fields = append(fields, importerconfig.FieldConsecutiveFailures)
 	}
 	if m.enabled != nil {
 		fields = append(fields, importerconfig.FieldEnabled)
@@ -2299,6 +2466,12 @@ func (m *ImporterConfigMutation) Field(name string) (ent.Value, bool) {
 		return m.SyncIntervalSeconds()
 	case importerconfig.FieldLastSyncAt:
 		return m.LastSyncAt()
+	case importerconfig.FieldLastAttemptAt:
+		return m.LastAttemptAt()
+	case importerconfig.FieldLastError:
+		return m.LastError()
+	case importerconfig.FieldConsecutiveFailures:
+		return m.ConsecutiveFailures()
 	case importerconfig.FieldEnabled:
 		return m.Enabled()
 	}
@@ -2322,6 +2495,12 @@ func (m *ImporterConfigMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldSyncIntervalSeconds(ctx)
 	case importerconfig.FieldLastSyncAt:
 		return m.OldLastSyncAt(ctx)
+	case importerconfig.FieldLastAttemptAt:
+		return m.OldLastAttemptAt(ctx)
+	case importerconfig.FieldLastError:
+		return m.OldLastError(ctx)
+	case importerconfig.FieldConsecutiveFailures:
+		return m.OldConsecutiveFailures(ctx)
 	case importerconfig.FieldEnabled:
 		return m.OldEnabled(ctx)
 	}
@@ -2375,6 +2554,27 @@ func (m *ImporterConfigMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetLastSyncAt(v)
 		return nil
+	case importerconfig.FieldLastAttemptAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastAttemptAt(v)
+		return nil
+	case importerconfig.FieldLastError:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastError(v)
+		return nil
+	case importerconfig.FieldConsecutiveFailures:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetConsecutiveFailures(v)
+		return nil
 	case importerconfig.FieldEnabled:
 		v, ok := value.(bool)
 		if !ok {
@@ -2393,6 +2593,9 @@ func (m *ImporterConfigMutation) AddedFields() []string {
 	if m.addsync_interval_seconds != nil {
 		fields = append(fields, importerconfig.FieldSyncIntervalSeconds)
 	}
+	if m.addconsecutive_failures != nil {
+		fields = append(fields, importerconfig.FieldConsecutiveFailures)
+	}
 	return fields
 }
 
@@ -2403,6 +2606,8 @@ func (m *ImporterConfigMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case importerconfig.FieldSyncIntervalSeconds:
 		return m.AddedSyncIntervalSeconds()
+	case importerconfig.FieldConsecutiveFailures:
+		return m.AddedConsecutiveFailures()
 	}
 	return nil, false
 }
@@ -2419,6 +2624,13 @@ func (m *ImporterConfigMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddSyncIntervalSeconds(v)
 		return nil
+	case importerconfig.FieldConsecutiveFailures:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddConsecutiveFailures(v)
+		return nil
 	}
 	return fmt.Errorf("unknown ImporterConfig numeric field %s", name)
 }
@@ -2429,6 +2641,12 @@ func (m *ImporterConfigMutation) ClearedFields() []string {
 	var fields []string
 	if m.FieldCleared(importerconfig.FieldLastSyncAt) {
 		fields = append(fields, importerconfig.FieldLastSyncAt)
+	}
+	if m.FieldCleared(importerconfig.FieldLastAttemptAt) {
+		fields = append(fields, importerconfig.FieldLastAttemptAt)
+	}
+	if m.FieldCleared(importerconfig.FieldLastError) {
+		fields = append(fields, importerconfig.FieldLastError)
 	}
 	return fields
 }
@@ -2446,6 +2664,12 @@ func (m *ImporterConfigMutation) ClearField(name string) error {
 	switch name {
 	case importerconfig.FieldLastSyncAt:
 		m.ClearLastSyncAt()
+		return nil
+	case importerconfig.FieldLastAttemptAt:
+		m.ClearLastAttemptAt()
+		return nil
+	case importerconfig.FieldLastError:
+		m.ClearLastError()
 		return nil
 	}
 	return fmt.Errorf("unknown ImporterConfig nullable field %s", name)
@@ -2472,6 +2696,15 @@ func (m *ImporterConfigMutation) ResetField(name string) error {
 		return nil
 	case importerconfig.FieldLastSyncAt:
 		m.ResetLastSyncAt()
+		return nil
+	case importerconfig.FieldLastAttemptAt:
+		m.ResetLastAttemptAt()
+		return nil
+	case importerconfig.FieldLastError:
+		m.ResetLastError()
+		return nil
+	case importerconfig.FieldConsecutiveFailures:
+		m.ResetConsecutiveFailures()
 		return nil
 	case importerconfig.FieldEnabled:
 		m.ResetEnabled()

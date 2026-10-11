@@ -74,8 +74,12 @@ func init() {
 	importerconfigDescSyncIntervalSeconds := importerconfigFields[2].Descriptor()
 	// importerconfig.DefaultSyncIntervalSeconds holds the default value on creation for the sync_interval_seconds field.
 	importerconfig.DefaultSyncIntervalSeconds = importerconfigDescSyncIntervalSeconds.Default.(int64)
+	// importerconfigDescConsecutiveFailures is the schema descriptor for consecutive_failures field.
+	importerconfigDescConsecutiveFailures := importerconfigFields[6].Descriptor()
+	// importerconfig.DefaultConsecutiveFailures holds the default value on creation for the consecutive_failures field.
+	importerconfig.DefaultConsecutiveFailures = importerconfigDescConsecutiveFailures.Default.(int)
 	// importerconfigDescEnabled is the schema descriptor for enabled field.
-	importerconfigDescEnabled := importerconfigFields[4].Descriptor()
+	importerconfigDescEnabled := importerconfigFields[7].Descriptor()
 	// importerconfig.DefaultEnabled holds the default value on creation for the enabled field.
 	importerconfig.DefaultEnabled = importerconfigDescEnabled.Default.(bool)
 	inviteMixin := schema.Invite{}.Mixin()

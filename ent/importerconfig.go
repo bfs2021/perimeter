@@ -29,6 +29,12 @@ type ImporterConfig struct {
 	SyncIntervalSeconds int64 `json:"sync_interval_seconds,omitempty"`
 	// LastSyncAt holds the value of the "last_sync_at" field.
 	LastSyncAt *time.Time `json:"last_sync_at,omitempty"`
+	// LastAttemptAt holds the value of the "last_attempt_at" field.
+	LastAttemptAt *time.Time `json:"last_attempt_at,omitempty"`
+	// LastError holds the value of the "last_error" field.
+	LastError string `json:"last_error,omitempty"`
+	// ConsecutiveFailures holds the value of the "consecutive_failures" field.
+	ConsecutiveFailures int `json:"consecutive_failures,omitempty"`
 	// Enabled holds the value of the "enabled" field.
 	Enabled      bool `json:"enabled,omitempty"`
 	selectValues sql.SelectValues
@@ -43,11 +49,11 @@ func (*ImporterConfig) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case importerconfig.FieldEnabled:
 			values[i] = new(sql.NullBool)
-		case importerconfig.FieldID, importerconfig.FieldSyncIntervalSeconds:
+		case importerconfig.FieldID, importerconfig.FieldSyncIntervalSeconds, importerconfig.FieldConsecutiveFailures:
 			values[i] = new(sql.NullInt64)
-		case importerconfig.FieldProvider:
+		case importerconfig.FieldProvider, importerconfig.FieldLastError:
 			values[i] = new(sql.NullString)
-		case importerconfig.FieldCreateTime, importerconfig.FieldUpdateTime, importerconfig.FieldLastSyncAt:
+		case importerconfig.FieldCreateTime, importerconfig.FieldUpdateTime, importerconfig.FieldLastSyncAt, importerconfig.FieldLastAttemptAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -106,6 +112,25 @@ func (_m *ImporterConfig) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.LastSyncAt = new(time.Time)
 				*_m.LastSyncAt = value.Time
+			}
+		case importerconfig.FieldLastAttemptAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field last_attempt_at", values[i])
+			} else if value.Valid {
+				_m.LastAttemptAt = new(time.Time)
+				*_m.LastAttemptAt = value.Time
+			}
+		case importerconfig.FieldLastError:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field last_error", values[i])
+			} else if value.Valid {
+				_m.LastError = value.String
+			}
+		case importerconfig.FieldConsecutiveFailures:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field consecutive_failures", values[i])
+			} else if value.Valid {
+				_m.ConsecutiveFailures = int(value.Int64)
 			}
 		case importerconfig.FieldEnabled:
 			if value, ok := values[i].(*sql.NullBool); !ok {
@@ -168,6 +193,17 @@ func (_m *ImporterConfig) String() string {
 		builder.WriteString("last_sync_at=")
 		builder.WriteString(v.Format(time.ANSIC))
 	}
+	builder.WriteString(", ")
+	if v := _m.LastAttemptAt; v != nil {
+		builder.WriteString("last_attempt_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	builder.WriteString("last_error=")
+	builder.WriteString(_m.LastError)
+	builder.WriteString(", ")
+	builder.WriteString("consecutive_failures=")
+	builder.WriteString(fmt.Sprintf("%v", _m.ConsecutiveFailures))
 	builder.WriteString(", ")
 	builder.WriteString("enabled=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Enabled))

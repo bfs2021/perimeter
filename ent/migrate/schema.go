@@ -67,6 +67,9 @@ var (
 		{Name: "credentials", Type: field.TypeBytes},
 		{Name: "sync_interval_seconds", Type: field.TypeInt64, Default: 3600},
 		{Name: "last_sync_at", Type: field.TypeTime, Nullable: true},
+		{Name: "last_attempt_at", Type: field.TypeTime, Nullable: true},
+		{Name: "last_error", Type: field.TypeString, Nullable: true},
+		{Name: "consecutive_failures", Type: field.TypeInt, Default: 0},
 		{Name: "enabled", Type: field.TypeBool, Default: true},
 	}
 	// ImporterConfigsTable holds the schema information for the "importer_configs" table.
