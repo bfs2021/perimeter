@@ -121,7 +121,7 @@ func TestInviteWithViewerRole(t *testing.T) {
 
 	form := url.Values{"email": {"viewer@example.com"}, "role": {"viewer"}}
 	resp := postForm(t, srv, tokens[user.RoleAdmin], "/invite", form)
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusSeeOther {
 		t.Fatalf("POST /invite: status %d, body:\n%s", resp.StatusCode, resp.Body)
 	}
 

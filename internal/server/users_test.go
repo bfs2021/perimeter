@@ -76,8 +76,8 @@ func TestDeleteUser(t *testing.T) {
 	}
 
 	resp, _ = authedRequest(t, srv, token, "POST", "/users/"+strconv.Itoa(u.ID)+"/delete")
-	if resp.StatusCode != http.StatusFound || resp.Location != "/settings" {
-		t.Fatalf("delete user: status %d location %q, want 302 to /settings", resp.StatusCode, resp.Location)
+	if resp.StatusCode != http.StatusSeeOther || resp.Location != "/settings" {
+		t.Fatalf("delete user: status %d location %q, want 303 to /settings", resp.StatusCode, resp.Location)
 	}
 
 	if _, err := client.User.Get(ctx, u.ID); !ent.IsNotFound(err) {

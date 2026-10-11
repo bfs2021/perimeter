@@ -91,8 +91,8 @@ func TestDeletedTargetsPageListsDeletedNotLive(t *testing.T) {
 	ids := importTargets(t, client, "live.example", "dead.example")
 
 	resp, _ := authedRequest(t, srv, token, "POST", "/targets/"+strconv.Itoa(ids["dead.example"])+"/delete")
-	if resp.StatusCode != http.StatusFound {
-		t.Fatalf("delete: status %d, want 302", resp.StatusCode)
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("delete: status %d, want 303", resp.StatusCode)
 	}
 
 	resp, body := authedRequest(t, srv, token, "GET", "/targets/deleted")
@@ -137,8 +137,8 @@ func TestRestoreAndPurgeRoutes(t *testing.T) {
 	// Restore a deleted target: redirects back to the deleted list.
 	authedRequest(t, srv, token, "POST", "/targets/"+dead+"/delete")
 	resp, _ := authedRequest(t, srv, token, "POST", "/targets/"+dead+"/restore")
-	if resp.StatusCode != http.StatusFound || resp.Location != "/targets/deleted" {
-		t.Errorf("restore: status %d location %q, want 302 to /targets/deleted", resp.StatusCode, resp.Location)
+	if resp.StatusCode != http.StatusSeeOther || resp.Location != "/targets/deleted" {
+		t.Errorf("restore: status %d location %q, want 303 to /targets/deleted", resp.StatusCode, resp.Location)
 	}
 	if _, body := authedRequest(t, srv, token, "GET", "/"); !strings.Contains(body, "dead.example") {
 		t.Errorf("restored target not back on the dashboard")
@@ -157,8 +157,8 @@ func TestRestoreAndPurgeRoutes(t *testing.T) {
 	// Purge a deleted target: redirects, and it is gone from the deleted list.
 	authedRequest(t, srv, token, "POST", "/targets/"+dead+"/delete")
 	resp, _ = authedRequest(t, srv, token, "POST", "/targets/"+dead+"/purge")
-	if resp.StatusCode != http.StatusFound || resp.Location != "/targets/deleted" {
-		t.Errorf("purge: status %d location %q, want 302 to /targets/deleted", resp.StatusCode, resp.Location)
+	if resp.StatusCode != http.StatusSeeOther || resp.Location != "/targets/deleted" {
+		t.Errorf("purge: status %d location %q, want 303 to /targets/deleted", resp.StatusCode, resp.Location)
 	}
 	if _, body := authedRequest(t, srv, token, "GET", "/targets/deleted"); strings.Contains(body, "dead.example") {
 		t.Errorf("purged target still listed as deleted")

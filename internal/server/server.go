@@ -20,6 +20,7 @@ import (
 	"perimeter/ent"
 	"perimeter/ent/importerconfig"
 	"perimeter/ent/notifierconfig"
+	"perimeter/ent/schema"
 	"perimeter/ent/tag"
 	"perimeter/ent/target"
 	"perimeter/ent/user"
@@ -110,6 +111,8 @@ func newViewEngine(viewsFS fs.FS) *html.Engine {
 
 	engine.AddFunc("withQuery", withQuery)
 	engine.AddFunc("eventLabel", notifierEventLabel)
+	engine.AddFunc("formValue", formValue)
+	engine.AddFunc("formChecked", formChecked)
 	return engine
 }
 
@@ -180,7 +183,8 @@ func (s *Server) setupRoutes() {
 	s.app.Use(func(c *fiber.Ctx) error { return fiber.ErrNotFound })
 }
 
-// templateData returns a fiber.Map with common template data (user, role).
+// templateData returns a fiber.Map with common template data (user, role, and
+// the pending flash message).
 func (s *Server) templateData(c *fiber.Ctx, extra fiber.Map) fiber.Map {
 	data := fiber.Map{}
 	if u := auth.GetUser(c); u != nil {
@@ -190,6 +194,12 @@ func (s *Server) templateData(c *fiber.Ctx, extra fiber.Map) fiber.Map {
 	}
 	for k, v := range extra {
 		data[k] = v
+	}
+	// Popped even when extra sets its own Flash, so the cookie is always cleared.
+	if f := popFlash(c); f != nil {
+		if _, set := data["Flash"]; !set {
+			data["Flash"] = f
+		}
 	}
 	return data
 }
@@ -939,6 +949,7 @@ func (s *Server) handleDeleteTarget(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "Invalid ID")
 	}
 
+	label := s.targetLabel(c.Context(), id)
 	err = s.storage.DeleteTarget(c.Context(), id)
 	if err != nil {
 		if errors.Is(err, storage.ErrTargetNotFound) || ent.IsNotFound(err) {
@@ -947,7 +958,18 @@ func (s *Server) handleDeleteTarget(c *fiber.Ctx) error {
 		return err
 	}
 
-	return c.Redirect("/")
+	setFlash(c, flash{Kind: "success", Message: fmt.Sprintf("Deleted %s. You can restore it from Deleted targets.", label)})
+	return c.Redirect("/", fiber.StatusSeeOther)
+}
+
+// targetLabel is the input of a target, live or soft-deleted, for a flash
+// message. A target that no longer exists is named by its id.
+func (s *Server) targetLabel(ctx context.Context, id int) string {
+	t, err := s.client.Target.Get(schema.SkipSoftDelete(ctx), id)
+	if err != nil {
+		return "target " + strconv.Itoa(id)
+	}
+	return t.Input
 }
 
 func (s *Server) handleDeletedTargets(c *fiber.Ctx) error {
@@ -968,6 +990,7 @@ func (s *Server) handleRestoreTarget(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "Invalid ID")
 	}
 
+	label := s.targetLabel(c.Context(), id)
 	err = s.storage.RestoreTarget(c.Context(), id)
 	if err != nil {
 		if errors.Is(err, storage.ErrTargetNotFound) {
@@ -976,7 +999,8 @@ func (s *Server) handleRestoreTarget(c *fiber.Ctx) error {
 		return err
 	}
 
-	return c.Redirect("/targets/deleted")
+	setFlash(c, flash{Kind: "success", Message: "Restored " + label + "."})
+	return c.Redirect("/targets/deleted", fiber.StatusSeeOther)
 }
 
 func (s *Server) handlePurgeTarget(c *fiber.Ctx) error {
@@ -985,6 +1009,7 @@ func (s *Server) handlePurgeTarget(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "Invalid ID")
 	}
 
+	label := s.targetLabel(c.Context(), id)
 	err = s.storage.PurgeTarget(c.Context(), id)
 	if err != nil {
 		if errors.Is(err, storage.ErrTargetNotFound) {
@@ -993,7 +1018,8 @@ func (s *Server) handlePurgeTarget(c *fiber.Ctx) error {
 		return err
 	}
 
-	return c.Redirect("/targets/deleted")
+	setFlash(c, flash{Kind: "success", Message: "Purged " + label + "."})
+	return c.Redirect("/targets/deleted", fiber.StatusSeeOther)
 }
 
 func (s *Server) handleImport(c *fiber.Ctx) error {
@@ -1104,17 +1130,21 @@ func (s *Server) handleInvite(c *fiber.Ctx) error {
 
 	token, err := s.auth.CreateInvite(c.Context(), u, email, inviteRole)
 	if err != nil {
-		return c.Render("views/settings", s.settingsData(c, fiber.Map{
-			"Error": userError("create invite", err),
-		}), "views/layouts/main")
+		setFlash(c, flash{
+			Kind:    "error",
+			Message: userError("create invite", err),
+			Form:    map[string]string{"email": email, "role": role},
+		})
+		return c.Redirect("/settings", fiber.StatusSeeOther)
 	}
 
 	inviteLink := fmt.Sprintf("%s/register/%s", c.BaseURL(), token)
-
-	return c.Render("views/settings", s.settingsData(c, fiber.Map{
-		"InviteLink":  inviteLink,
-		"InviteEmail": email,
-	}), "views/layouts/main")
+	setFlash(c, flash{
+		Kind:       "success",
+		Message:    "Invite created for " + email + ".",
+		InviteLink: inviteLink,
+	})
+	return c.Redirect("/settings", fiber.StatusSeeOther)
 }
 
 func (s *Server) handleUsers(c *fiber.Ctx) error {
@@ -1130,9 +1160,8 @@ func (s *Server) handleDeleteUser(c *fiber.Ctx) error {
 	// Don't allow deleting yourself
 	currentUser := auth.GetUser(c)
 	if currentUser.ID == id {
-		return c.Render("views/settings", s.settingsData(c, fiber.Map{
-			"Error": "Cannot delete your own account",
-		}), "views/layouts/main")
+		setFlash(c, flash{Kind: "error", Message: "Cannot delete your own account"})
+		return c.Redirect("/settings", fiber.StatusSeeOther)
 	}
 
 	if err := s.auth.DeleteUser(c.Context(), id); err != nil {
@@ -1140,12 +1169,12 @@ func (s *Server) handleDeleteUser(c *fiber.Ctx) error {
 			return fiber.NewError(fiber.StatusNotFound, "User not found")
 		}
 		log.Printf("delete user %d: %v", id, err)
-		return c.Render("views/settings", s.settingsData(c, fiber.Map{
-			"Error": "Could not delete the user. Check the server log for details.",
-		}), "views/layouts/main")
+		setFlash(c, flash{Kind: "error", Message: "Could not delete the user. Check the server log for details."})
+		return c.Redirect("/settings", fiber.StatusSeeOther)
 	}
 
-	return c.Redirect("/settings")
+	setFlash(c, flash{Kind: "success", Message: "User deleted."})
+	return c.Redirect("/settings", fiber.StatusSeeOther)
 }
 
 func (s *Server) handleCreateImporter(c *fiber.Ctx) error {
@@ -1160,9 +1189,12 @@ func (s *Server) handleCreateImporter(c *fiber.Ctx) error {
 
 	// Validate credentials now instead of silently failing in the background sync loop.
 	if _, err := s.registry.Get(provider, []byte(credentials)); err != nil {
-		return c.Render("views/settings", s.settingsData(c, fiber.Map{
-			"Error": "Invalid importer config: " + err.Error(),
-		}), "views/layouts/main")
+		setFlash(c, flash{
+			Kind:    "error",
+			Message: "Invalid importer config: " + err.Error(),
+			Form:    importerForm(provider, intervalStr, credentials),
+		})
+		return c.Redirect("/settings", fiber.StatusSeeOther)
 	}
 
 	_, err = s.client.ImporterConfig.Create().
@@ -1172,12 +1204,32 @@ func (s *Server) handleCreateImporter(c *fiber.Ctx) error {
 		SetEnabled(true).
 		Save(c.Context())
 	if err != nil {
-		return c.Render("views/settings", s.settingsData(c, fiber.Map{
-			"Error": userError("create importer", err),
-		}), "views/layouts/main")
+		setFlash(c, flash{
+			Kind:    "error",
+			Message: userError("create importer", err),
+			Form:    importerForm(provider, intervalStr, credentials),
+		})
+		return c.Redirect("/settings", fiber.StatusSeeOther)
 	}
 
-	return c.Redirect("/settings")
+	setFlash(c, flash{Kind: "success", Message: "Importer added. The first sync is running."})
+	return c.Redirect("/settings", fiber.StatusSeeOther)
+}
+
+// importerForm keeps the non-secret fields of a rejected importer form so the
+// page can prefill them. Only the dns_bruteforce domain is read out of the
+// credentials; tokens, passwords and keys are never kept.
+func importerForm(provider, interval, credentials string) map[string]string {
+	form := map[string]string{"provider": provider, "sync_interval": interval}
+	if provider == "dns_bruteforce" {
+		var cfg struct {
+			Domain string `json:"domain"`
+		}
+		if json.Unmarshal([]byte(credentials), &cfg) == nil {
+			form["domain"] = cfg.Domain
+		}
+	}
+	return form
 }
 
 func (s *Server) handleDeleteImporter(c *fiber.Ctx) error {
@@ -1187,12 +1239,12 @@ func (s *Server) handleDeleteImporter(c *fiber.Ctx) error {
 	}
 
 	if err := s.client.ImporterConfig.DeleteOneID(id).Exec(c.Context()); err != nil {
-		return c.Render("views/settings", s.settingsData(c, fiber.Map{
-			"Error": userError("delete importer", err),
-		}), "views/layouts/main")
+		setFlash(c, flash{Kind: "error", Message: userError("delete importer", err)})
+		return c.Redirect("/settings", fiber.StatusSeeOther)
 	}
 
-	return c.Redirect("/settings")
+	setFlash(c, flash{Kind: "success", Message: "Importer deleted."})
+	return c.Redirect("/settings", fiber.StatusSeeOther)
 }
 
 func (s *Server) handleToggleImporter(c *fiber.Ctx) error {
@@ -1209,16 +1261,20 @@ func (s *Server) handleToggleImporter(c *fiber.Ctx) error {
 	if err := s.client.ImporterConfig.UpdateOne(cfg).SetEnabled(!cfg.Enabled).Exec(c.Context()); err != nil {
 		return err
 	}
-	return c.Redirect("/settings")
+	msg := "Importer disabled."
+	if !cfg.Enabled {
+		msg = "Importer enabled."
+	}
+	setFlash(c, flash{Kind: "success", Message: msg})
+	return c.Redirect("/settings", fiber.StatusSeeOther)
 }
 
 // handleSyncImporter runs one importer immediately ("Sync now") and shows
 // the result on the settings page.
 func (s *Server) handleSyncImporter(c *fiber.Ctx) error {
 	if s.syncer == nil {
-		return c.Render("views/settings", s.settingsData(c, fiber.Map{
-			"Error": "Sync not available",
-		}), "views/layouts/main")
+		setFlash(c, flash{Kind: "error", Message: "Sync not available"})
+		return c.Redirect("/settings", fiber.StatusSeeOther)
 	}
 
 	id, err := strconv.Atoi(c.Params("id"))
@@ -1241,16 +1297,14 @@ func (s *Server) handleSyncImporter(c *fiber.Ctx) error {
 	if err != nil {
 		msg := "Sync failed: " + err.Error()
 		if errors.Is(err, importer.ErrSyncRunning) {
-			msg = "Sync already running"
+			msg = "A sync for this importer is already running (one starts automatically when an importer is added). Refresh in a minute to see the result."
 		}
-		return c.Render("views/settings", s.settingsData(c, fiber.Map{
-			"Error": msg,
-		}), "views/layouts/main")
+		setFlash(c, flash{Kind: "error", Message: msg})
+		return c.Redirect("/settings", fiber.StatusSeeOther)
 	}
 
-	return c.Render("views/settings", s.settingsData(c, fiber.Map{
-		"Success": fmt.Sprintf("Synced %s: %d targets imported", cfg.Provider, count),
-	}), "views/layouts/main")
+	setFlash(c, flash{Kind: "success", Message: fmt.Sprintf("Synced %s: %d targets imported", cfg.Provider, count)})
+	return c.Redirect("/settings", fiber.StatusSeeOther)
 }
 
 // --- Notifier handlers ---
@@ -1313,17 +1367,23 @@ func (s *Server) handleCreateNotifier(c *fiber.Ctx) error {
 	rawEvents := c.Request().PostArgs().PeekMulti("events")
 	events, err := parseNotifierEvents(rawEvents)
 	if err != nil {
-		return c.Render("views/settings", s.settingsData(c, fiber.Map{
-			"Error": "Invalid notifier events: " + err.Error(),
-		}), "views/layouts/main")
+		setFlash(c, flash{
+			Kind:    "error",
+			Message: "Invalid notifier events: " + err.Error(),
+			Form:    notifierForm(provider, rawEvents, config),
+		})
+		return c.Redirect("/settings", fiber.StatusSeeOther)
 	}
 
 	// Check the config now so a bad URL or address fails here, not in the
 	// background dispatcher.
 	if _, err := s.notifierRegistry.Get(provider, json.RawMessage(config)); err != nil {
-		return c.Render("views/settings", s.settingsData(c, fiber.Map{
-			"Error": "Invalid notifier config: " + err.Error(),
-		}), "views/layouts/main")
+		setFlash(c, flash{
+			Kind:    "error",
+			Message: "Invalid notifier config: " + err.Error(),
+			Form:    notifierForm(provider, rawEvents, config),
+		})
+		return c.Redirect("/settings", fiber.StatusSeeOther)
 	}
 
 	create := s.client.NotifierConfig.Create().
@@ -1334,12 +1394,41 @@ func (s *Server) handleCreateNotifier(c *fiber.Ctx) error {
 		create.SetEvents(events)
 	}
 	if _, err := create.Save(c.Context()); err != nil {
-		return c.Render("views/settings", s.settingsData(c, fiber.Map{
-			"Error": userError("create notifier", err),
-		}), "views/layouts/main")
+		setFlash(c, flash{
+			Kind:    "error",
+			Message: userError("create notifier", err),
+			Form:    notifierForm(provider, rawEvents, config),
+		})
+		return c.Redirect("/settings", fiber.StatusSeeOther)
 	}
 
-	return c.Redirect("/settings")
+	setFlash(c, flash{Kind: "success", Message: "Notifier added."})
+	return c.Redirect("/settings", fiber.StatusSeeOther)
+}
+
+// notifierForm keeps the non-secret fields of a rejected notifier form so the
+// page can prefill them: the provider, the ticked events, the email recipients
+// and the webhook URL. Anything else in the config is not kept.
+func notifierForm(provider string, rawEvents [][]byte, config string) map[string]string {
+	events := make([]string, 0, len(rawEvents))
+	for _, e := range rawEvents {
+		events = append(events, string(e))
+	}
+	form := map[string]string{"provider": provider, "events": strings.Join(events, ",")}
+
+	var cfg struct {
+		To  []string `json:"to"`
+		URL string   `json:"url"`
+	}
+	if json.Unmarshal([]byte(config), &cfg) == nil {
+		switch provider {
+		case "email":
+			form["recipients"] = strings.Join(cfg.To, "\n")
+		case "webhook":
+			form["url"] = cfg.URL
+		}
+	}
+	return form
 }
 
 func (s *Server) handleDeleteNotifier(c *fiber.Ctx) error {
@@ -1349,12 +1438,12 @@ func (s *Server) handleDeleteNotifier(c *fiber.Ctx) error {
 	}
 
 	if err := s.client.NotifierConfig.DeleteOneID(id).Exec(c.Context()); err != nil {
-		return c.Render("views/settings", s.settingsData(c, fiber.Map{
-			"Error": userError("delete notifier", err),
-		}), "views/layouts/main")
+		setFlash(c, flash{Kind: "error", Message: userError("delete notifier", err)})
+		return c.Redirect("/settings", fiber.StatusSeeOther)
 	}
 
-	return c.Redirect("/settings")
+	setFlash(c, flash{Kind: "success", Message: "Notifier deleted."})
+	return c.Redirect("/settings", fiber.StatusSeeOther)
 }
 
 func (s *Server) handleToggleNotifier(c *fiber.Ctx) error {
@@ -1371,7 +1460,12 @@ func (s *Server) handleToggleNotifier(c *fiber.Ctx) error {
 	if err := s.client.NotifierConfig.UpdateOne(cfg).SetEnabled(!cfg.Enabled).Exec(c.Context()); err != nil {
 		return err
 	}
-	return c.Redirect("/settings")
+	msg := "Notifier disabled."
+	if !cfg.Enabled {
+		msg = "Notifier enabled."
+	}
+	setFlash(c, flash{Kind: "success", Message: msg})
+	return c.Redirect("/settings", fiber.StatusSeeOther)
 }
 
 // --- Tag handlers ---
@@ -1388,12 +1482,12 @@ func (s *Server) handleCreateTag(c *fiber.Ctx) error {
 		SetColor(color).
 		Save(c.Context())
 	if err != nil {
-		return c.Render("views/settings", s.settingsData(c, fiber.Map{
-			"Error": userError("create tag", err),
-		}), "views/layouts/main")
+		setFlash(c, flash{Kind: "error", Message: userError("create tag", err)})
+		return c.Redirect("/settings", fiber.StatusSeeOther)
 	}
 
-	return c.Redirect("/settings")
+	setFlash(c, flash{Kind: "success", Message: fmt.Sprintf(`Tag "%s" created.`, name)})
+	return c.Redirect("/settings", fiber.StatusSeeOther)
 }
 
 func (s *Server) handleDeleteTag(c *fiber.Ctx) error {
@@ -1403,12 +1497,12 @@ func (s *Server) handleDeleteTag(c *fiber.Ctx) error {
 	}
 
 	if err := s.client.Tag.DeleteOneID(id).Exec(c.Context()); err != nil {
-		return c.Render("views/settings", s.settingsData(c, fiber.Map{
-			"Error": userError("delete tag", err),
-		}), "views/layouts/main")
+		setFlash(c, flash{Kind: "error", Message: userError("delete tag", err)})
+		return c.Redirect("/settings", fiber.StatusSeeOther)
 	}
 
-	return c.Redirect("/settings")
+	setFlash(c, flash{Kind: "success", Message: "Tag deleted."})
+	return c.Redirect("/settings", fiber.StatusSeeOther)
 }
 
 func (s *Server) handleUpdateTargetTags(c *fiber.Ctx) error {
@@ -1453,7 +1547,8 @@ func (s *Server) handleUpdateTargetTags(c *fiber.Ctx) error {
 		return err
 	}
 
-	return c.Redirect(fmt.Sprintf("/targets/%d", id))
+	setFlash(c, flash{Kind: "success", Message: "Tags updated."})
+	return c.Redirect(fmt.Sprintf("/targets/%d", id), fiber.StatusSeeOther)
 }
 
 // --- Export handler ---
@@ -1795,10 +1890,16 @@ func (s *Server) handleBulkDelete(c *fiber.Ctx) error {
 		return s.renderBulkDeleteConfirm(c, ids)
 	}
 
-	if _, err := s.storage.DeleteTargets(c.Context(), ids); err != nil {
+	n, err := s.storage.DeleteTargets(c.Context(), ids)
+	if err != nil {
 		return err
 	}
-	return c.Redirect("/")
+	noun := "targets"
+	if n == 1 {
+		noun = "target"
+	}
+	setFlash(c, flash{Kind: "success", Message: fmt.Sprintf("Deleted %d %s.", n, noun)})
+	return c.Redirect("/", fiber.StatusSeeOther)
 }
 
 func (s *Server) renderBulkDeleteConfirm(c *fiber.Ctx, ids []int) error {

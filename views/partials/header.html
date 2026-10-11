@@ -21,3 +21,10 @@
   {{end}}
 </nav>
 <div class="container">
+{{with .Flash}}
+{{if eq .Kind "error"}}
+<div class="alert alert-error" role="alert">{{.Message}}</div>
+{{else}}
+<div class="alert alert-success" role="status">{{.Message}}</div>
+{{end}}
+{{end}}

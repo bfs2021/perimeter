@@ -59,7 +59,7 @@ func TestSyncImporter(t *testing.T) {
 	}{
 		{name: "success", count: 3, want: "Synced gandi: 3 targets imported"},
 		{name: "failure", syncErr: errors.New("boom"), want: "Sync failed: boom"},
-		{name: "already running", syncErr: importer.ErrSyncRunning, want: "Sync already running"},
+		{name: "already running", syncErr: importer.ErrSyncRunning, want: "A sync for this importer is already running"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -68,10 +68,11 @@ func TestSyncImporter(t *testing.T) {
 			fs.err, fs.count = tt.syncErr, tt.count
 
 			resp := postForm(t, srv, token, fmt.Sprintf("/importers/%d/sync", cfg.ID), url.Values{})
-			if resp.StatusCode != http.StatusOK {
-				t.Fatalf("status %d, want 200 with the settings page; body:\n%s", resp.StatusCode, resp.Body)
+			page := followRedirect(t, srv, token, resp)
+			if page.StatusCode != http.StatusOK {
+				t.Fatalf("status %d, want 200 with the settings page; body:\n%s", page.StatusCode, page.Body)
 			}
-			if !strings.Contains(resp.Body, tt.want) {
+			if !strings.Contains(page.Body, tt.want) {
 				t.Errorf("page does not show %q", tt.want)
 			}
 			if fs.cfg == nil || fs.cfg.ID != cfg.ID {

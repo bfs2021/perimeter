@@ -8,12 +8,12 @@ import (
 	"testing"
 )
 
-// Tag action failures re-render the settings page with a friendly message;
+// Tag action failures redirect to the settings page with a friendly flash;
 // driver errors must not leak into it.
 func TestDeleteUnknownTagShowsFriendlyError(t *testing.T) {
 	srv, _, token := authedServer(t)
 
-	resp := postForm(t, srv, token, "/tags/999999/delete", url.Values{})
+	resp := followRedirect(t, srv, token, postForm(t, srv, token, "/tags/999999/delete", url.Values{}))
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status %d, want 200 with the settings page; body:\n%s", resp.StatusCode, resp.Body)
 	}
@@ -32,7 +32,7 @@ func TestCreateDuplicateTagShowsFriendlyError(t *testing.T) {
 		t.Fatalf("create tag: %v", err)
 	}
 
-	resp := postForm(t, srv, token, "/tags", url.Values{"name": {"prod"}})
+	resp := followRedirect(t, srv, token, postForm(t, srv, token, "/tags", url.Values{"name": {"prod"}}))
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status %d, want 200 with the settings page; body:\n%s", resp.StatusCode, resp.Body)
 	}
