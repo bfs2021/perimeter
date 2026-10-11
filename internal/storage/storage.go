@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net"
+	"strings"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -37,6 +37,12 @@ type Storage interface {
 	// General
 	Close() error
 	ImportTargets(ctx context.Context, lines []string) (int, error)
+	// ImportTargetsReport is like ImportTargets but reports what happened to
+	// each line: a new row (Added), a row that was already live (Existing), a
+	// soft-deleted row that was revived (Restored), or a line that failed
+	// validation (Invalid, kept as submitted). Duplicates within one import
+	// are counted once.
+	ImportTargetsReport(ctx context.Context, lines []string) (ImportResult, error)
 	GetTargets(ctx context.Context, states ...target.Reachability) ([]*ent.Target, error)
 	ListTargets(ctx context.Context, f TargetFilter, sort TargetSort, limit, offset int) ([]*ent.Target, error)
 	TargetStats(ctx context.Context, f TargetFilter, now time.Time, window time.Duration) (TargetStats, error)
@@ -104,6 +110,17 @@ type SSLResult struct {
 	Vulnerabilities []string
 }
 
+// ImportResult splits an import by what happened to each line: rows created
+// (Added), rows already live (Existing), soft-deleted rows revived
+// (Restored), and lines that failed validation (Invalid, kept as submitted).
+// Duplicates within one import are counted once.
+type ImportResult struct {
+	Added    []string
+	Existing []string
+	Restored []string
+	Invalid  []string
+}
+
 // EntStorage implements Storage using Ent
 type EntStorage struct {
 	client *ent.Client
@@ -117,11 +134,22 @@ func (s *EntStorage) Close() error {
 	return s.client.Close()
 }
 
+// importOutcome records what an import did with one target: a new row was
+// created, a live row was already there, or a soft-deleted row was revived.
+type importOutcome int
+
+const (
+	importNew importOutcome = iota
+	importExisting
+	importRestored
+)
+
 // importTarget creates the target for input, or updates the existing row. A
 // soft-deleted row holds the same unique input, so it is revived rather than
 // duplicated: its scan history comes back with it, and its summary is
-// refreshed because scans may have been written while it was hidden.
-func (s *EntStorage) importTarget(ctx context.Context, input string, isIP bool) error {
+// refreshed because scans may have been written while it was hidden. It
+// reports which case happened.
+func (s *EntStorage) importTarget(ctx context.Context, input string, isIP bool) (importOutcome, error) {
 	existing, err := s.client.Target.Query().
 		Where(target.InputEQ(input)).
 		Only(schema.SkipSoftDelete(ctx))
@@ -130,40 +158,83 @@ func (s *EntStorage) importTarget(ctx context.Context, input string, isIP bool) 
 			SetInput(input).
 			SetIsIP(isIP).
 			Save(ctx)
-		return err
+		if err != nil {
+			return importNew, err
+		}
+		return importNew, nil
 	}
 	if err != nil {
-		return err
+		return importOutcome(0), err
 	}
 	if existing.DeletedAt == nil {
-		return s.client.Target.Update().
+		err := s.client.Target.Update().
 			Where(target.InputEQ(input)).
 			SetIsIP(isIP).
 			Exec(ctx)
+		return importExisting, err
 	}
 	if err := s.client.Target.UpdateOne(existing).
 		SetIsIP(isIP).
 		ClearDeletedAt().
 		Exec(ctx); err != nil {
-		return err
+		return importRestored, err
 	}
-	return refreshSummary(ctx, s.client, target.ID(existing.ID))
+	if err := refreshSummary(ctx, s.client, target.ID(existing.ID)); err != nil {
+		return importRestored, err
+	}
+	return importRestored, nil
 }
 
-func (s *EntStorage) ImportTargets(ctx context.Context, lines []string) (int, error) {
-	count := 0
+// ImportTargetsReport imports each non-empty line and reports what happened
+// to it. Lines are normalized, so "https://example.com/path" and
+// "example.com" count as the same target, and duplicates within one import
+// are counted once. Invalid lines land in ImportResult.Invalid with their
+// original text. Per-line database errors are logged and skipped.
+func (s *EntStorage) ImportTargetsReport(ctx context.Context, lines []string) (ImportResult, error) {
+	var res ImportResult
+	seen := make(map[string]bool)
 	for _, line := range lines {
+		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
-		isIP := net.ParseIP(line) != nil
-		if err := s.importTarget(ctx, line, isIP); err != nil {
-			log.Printf("Error importing %s: %v", line, err)
-		} else {
-			count++
+		norm, isIP, ok := NormalizeTarget(line)
+		if !ok {
+			if !seen[line] {
+				seen[line] = true
+				res.Invalid = append(res.Invalid, line)
+			}
+			continue
+		}
+		if seen[norm] {
+			continue
+		}
+		seen[norm] = true
+		outcome, err := s.importTarget(ctx, norm, isIP)
+		if err != nil {
+			log.Printf("Error importing %s: %v", norm, err)
+			continue
+		}
+		switch outcome {
+		case importNew:
+			res.Added = append(res.Added, norm)
+		case importExisting:
+			res.Existing = append(res.Existing, norm)
+		case importRestored:
+			res.Restored = append(res.Restored, norm)
 		}
 	}
-	return count, nil
+	return res, nil
+}
+
+// ImportTargets imports the lines and returns how many targets were touched:
+// new, existing, and restored. Invalid lines are not counted.
+func (s *EntStorage) ImportTargets(ctx context.Context, lines []string) (int, error) {
+	res, err := s.ImportTargetsReport(ctx, lines)
+	if err != nil {
+		return 0, err
+	}
+	return len(res.Added) + len(res.Existing) + len(res.Restored), nil
 }
 
 // latestPerParent keeps only the newest scan row per parent, for callers that

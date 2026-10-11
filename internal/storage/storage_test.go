@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -65,6 +66,69 @@ func TestImportTargetsIdempotent(t *testing.T) {
 	}
 	if len(targets) != 1 {
 		t.Errorf("expected 1 target, got %d", len(targets))
+	}
+}
+
+func TestImportTargetsReport(t *testing.T) {
+	s := newTestStorage(t)
+	ctx := context.Background()
+
+	// gone.test starts soft-deleted so the import revives it.
+	if _, err := s.ImportTargets(ctx, []string{"gone.test"}); err != nil {
+		t.Fatalf("ImportTargets: %v", err)
+	}
+	targets, err := s.GetTargets(ctx)
+	if err != nil {
+		t.Fatalf("GetTargets: %v", err)
+	}
+	if err := s.DeleteTarget(ctx, targets[0].ID); err != nil {
+		t.Fatalf("DeleteTarget: %v", err)
+	}
+
+	res, err := s.ImportTargetsReport(ctx, []string{
+		"example.com",            // new
+		"example.com",            // duplicate within the input, counted once
+		"https://new2.test/path", // normalized to new2.test, new
+		"gone.test",              // soft-deleted, revived
+		"999.999.999.999",        // invalid
+		"999.999.999.999",        // invalid duplicate, listed once
+		"",                       // skipped
+	})
+	if err != nil {
+		t.Fatalf("ImportTargetsReport: %v", err)
+	}
+	if want := []string{"example.com", "new2.test"}; !slices.Equal(res.Added, want) {
+		t.Errorf("Added = %v, want %v", res.Added, want)
+	}
+	if len(res.Existing) != 0 {
+		t.Errorf("Existing = %v, want empty", res.Existing)
+	}
+	if want := []string{"gone.test"}; !slices.Equal(res.Restored, want) {
+		t.Errorf("Restored = %v, want %v", res.Restored, want)
+	}
+	if want := []string{"999.999.999.999"}; !slices.Equal(res.Invalid, want) {
+		t.Errorf("Invalid = %v, want %v", res.Invalid, want)
+	}
+
+	// A second import of the live row lands in Existing.
+	res, err = s.ImportTargetsReport(ctx, []string{"example.com"})
+	if err != nil {
+		t.Fatalf("ImportTargetsReport again: %v", err)
+	}
+	if want := []string{"example.com"}; !slices.Equal(res.Existing, want) {
+		t.Errorf("Existing = %v, want %v", res.Existing, want)
+	}
+	if len(res.Added) != 0 || len(res.Restored) != 0 || len(res.Invalid) != 0 {
+		t.Errorf("unexpected buckets: %+v", res)
+	}
+
+	// The thin wrapper counts every bucket.
+	count, err := s.ImportTargets(ctx, []string{"example.com"})
+	if err != nil {
+		t.Fatalf("ImportTargets: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("ImportTargets count = %d, want 1", count)
 	}
 }
 
