@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
@@ -10,6 +11,21 @@ import (
 
 	"perimeter/scanner/csp"
 )
+
+// An unknown target id renders the styled error page, not bare text.
+func TestUnknownTargetRendersErrorPage(t *testing.T) {
+	srv, _, token := authedServer(t)
+
+	resp := send(t, srv, token, "GET", "/targets/999999", "", "")
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("GET /targets/999999: status %d, want 404; body:\n%s", resp.StatusCode, resp.Body)
+	}
+	for _, want := range []string{"Back to dashboard", "Target not found"} {
+		if !strings.Contains(resp.Body, want) {
+			t.Errorf("error page missing %q; body:\n%s", want, resp.Body)
+		}
+	}
+}
 
 func TestTargetDetailsCSPSeverityBadges(t *testing.T) {
 	srv, client, token := authedServer(t)

@@ -245,7 +245,7 @@ func (s *Server) handleSetup(c *fiber.Ctx) error {
 	u, err := s.auth.Register(c.Context(), email, name, password)
 	if err != nil {
 		return c.Render("views/setup", fiber.Map{
-			"Error": "Failed to create admin: " + err.Error(),
+			"Error": userError("create admin", err),
 		}, "views/layouts/main")
 	}
 
@@ -282,7 +282,7 @@ func (s *Server) handleRegisterPage(c *fiber.Ctx) error {
 	// Validate invite token and get email
 	inv, err := s.auth.ValidateInviteToken(c.Context(), token)
 	if err != nil {
-		return c.Status(400).SendString("Invalid or expired invite link")
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid or expired invite link")
 	}
 
 	return c.Render("views/register", fiber.Map{
@@ -338,21 +338,21 @@ func (s *Server) handleOIDCLogin(c *fiber.Ctx) error {
 func (s *Server) handleOIDCCallback(c *fiber.Ctx) error {
 	state := c.Cookies("oidc_state")
 	if state == "" || state != c.Query("state") {
-		return c.Status(400).SendString("Invalid state")
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid state")
 	}
 	c.ClearCookie("oidc_state")
 
 	claims, err := s.auth.OIDCExchange(c.Context(), c.Query("code"))
 	if err != nil {
-		return c.Status(400).SendString("Authentication failed")
+		return fiber.NewError(fiber.StatusBadRequest, "Authentication failed")
 	}
 
 	u, err := s.auth.OIDCResolveUser(c.Context(), claims)
 	if err != nil {
-		return c.Status(500).SendString("Internal error")
+		return err
 	}
 	if u == nil {
-		return c.Status(403).SendString("Access denied — no account or invite found for this email")
+		return fiber.NewError(fiber.StatusForbidden, "Access denied — no account or invite found for this email")
 	}
 
 	return s.createSessionAndRedirect(c, u)
@@ -361,7 +361,7 @@ func (s *Server) handleOIDCCallback(c *fiber.Ctx) error {
 func (s *Server) createSessionAndRedirect(c *fiber.Ctx, u *ent.User) error {
 	token, err := s.auth.CreateSession(c.Context(), u)
 	if err != nil {
-		return c.Status(500).SendString("Failed to create session")
+		return err
 	}
 
 	c.Cookie(&fiber.Cookie{
@@ -587,7 +587,7 @@ func (s *Server) handleIndex(c *fiber.Ctx) error {
 	raw := queryValues(c)
 	filter, sort, err := parseDashboardQuery(raw)
 	if err != nil {
-		return c.Status(400).SendString(err.Error())
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
 	}
 	query := dashboardQuery(raw)
 
@@ -595,7 +595,7 @@ func (s *Server) handleIndex(c *fiber.Ctx) error {
 	// The stat cards describe every target matching the filter, not the page.
 	stats, err := s.storage.TargetStats(ctx, filter, time.Now(), s.certExpiryWindow)
 	if err != nil {
-		return c.Status(500).SendString(err.Error())
+		return err
 	}
 
 	pageSize := s.dashboardPageSize
@@ -604,21 +604,21 @@ func (s *Server) handleIndex(c *fiber.Ctx) error {
 
 	targets, err := s.storage.ListTargets(ctx, filter, sort, pageSize, (page-1)*pageSize)
 	if err != nil {
-		return c.Status(500).SendString(err.Error())
+		return err
 	}
 
 	allTags, _ := s.client.Tag.Query().All(ctx)
 
 	deletedCount, err := s.storage.CountDeletedTargets(ctx)
 	if err != nil {
-		return c.Status(500).SendString(err.Error())
+		return err
 	}
 
 	// State counts ignore the active state filter, so every state link shows
 	// how many targets the other filters would still match.
 	stateCounts, err := s.storage.StateCounts(ctx, filter)
 	if err != nil {
-		return c.Status(500).SendString(err.Error())
+		return err
 	}
 	stateTotal := 0
 	for _, n := range stateCounts {
@@ -627,16 +627,16 @@ func (s *Server) handleIndex(c *fiber.Ctx) error {
 
 	headers, err := sortHeaders(query, sort)
 	if err != nil {
-		return c.Status(500).SendString(err.Error())
+		return err
 	}
 	pag, err := dashboardPagination(query, page, totalPages)
 	if err != nil {
-		return c.Status(500).SendString(err.Error())
+		return err
 	}
 	clearURL, err := withQuery(query, "state", "", "tag", "", "csp", "", "ssl", "",
 		"ssl_below", "", "port", "", "expiring", "")
 	if err != nil {
-		return c.Status(500).SendString(err.Error())
+		return err
 	}
 
 	return c.Render("views/index", s.templateData(c, fiber.Map{
@@ -844,22 +844,22 @@ func (s *Server) handleTargetDetails(c *fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		return c.Status(400).SendString("Invalid ID")
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid ID")
 	}
 
 	target, err := s.storage.GetTargetBasic(c.Context(), id)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return c.Status(404).SendString("Target not found")
+			return fiber.NewError(fiber.StatusNotFound, "Target not found")
 		}
-		return c.Status(500).SendString(err.Error())
+		return err
 	}
 
 	switch c.Query("fragment") {
 	case "ssl":
 		sslScans, sslPagination, err := s.sslHistoryData(c.Context(), c, target.ID)
 		if err != nil {
-			return c.Status(500).SendString(err.Error())
+			return err
 		}
 		return c.Render("views/partials/ssl_section", fiber.Map{
 			"SSLScans":      sslScans,
@@ -868,7 +868,7 @@ func (s *Server) handleTargetDetails(c *fiber.Ctx) error {
 	case "csp":
 		cspScans, cspPagination, err := s.cspHistoryData(c.Context(), c, target.ID)
 		if err != nil {
-			return c.Status(500).SendString(err.Error())
+			return err
 		}
 		return c.Render("views/partials/csp_section", fiber.Map{
 			"CSPScans":      cspScans,
@@ -877,33 +877,33 @@ func (s *Server) handleTargetDetails(c *fiber.Ctx) error {
 	case "ip":
 		ipID, err := strconv.Atoi(c.Query("ipId"))
 		if err != nil {
-			return c.Status(400).SendString("Invalid ipId")
+			return fiber.NewError(fiber.StatusBadRequest, "Invalid ipId")
 		}
 		for _, i := range target.Edges.Ips {
 			if i.ID == ipID {
 				row, err := s.ipHistoryData(c.Context(), c, i)
 				if err != nil {
-					return c.Status(500).SendString(err.Error())
+					return err
 				}
 				return c.Render("views/partials/ip_section", row)
 			}
 		}
-		return c.Status(404).SendString("IP not found")
+		return fiber.NewError(fiber.StatusNotFound, "IP not found")
 	}
 
 	sslScans, sslPagination, err := s.sslHistoryData(c.Context(), c, target.ID)
 	if err != nil {
-		return c.Status(500).SendString(err.Error())
+		return err
 	}
 	cspScans, cspPagination, err := s.cspHistoryData(c.Context(), c, target.ID)
 	if err != nil {
-		return c.Status(500).SendString(err.Error())
+		return err
 	}
 	ipRows := make([]ipScanRow, 0, len(target.Edges.Ips))
 	for _, i := range target.Edges.Ips {
 		row, err := s.ipHistoryData(c.Context(), c, i)
 		if err != nil {
-			return c.Status(500).SendString(err.Error())
+			return err
 		}
 		ipRows = append(ipRows, row)
 	}
@@ -926,15 +926,15 @@ func (s *Server) handleDeleteTarget(c *fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		return c.Status(400).SendString("Invalid ID")
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid ID")
 	}
 
 	err = s.storage.DeleteTarget(c.Context(), id)
 	if err != nil {
 		if errors.Is(err, storage.ErrTargetNotFound) || ent.IsNotFound(err) {
-			return c.Status(404).SendString("Target not found")
+			return fiber.NewError(fiber.StatusNotFound, "Target not found")
 		}
-		return c.Status(500).SendString(err.Error())
+		return err
 	}
 
 	return c.Redirect("/")
@@ -943,7 +943,7 @@ func (s *Server) handleDeleteTarget(c *fiber.Ctx) error {
 func (s *Server) handleDeletedTargets(c *fiber.Ctx) error {
 	targets, err := s.storage.ListDeletedTargets(c.Context())
 	if err != nil {
-		return c.Status(500).SendString(err.Error())
+		return err
 	}
 
 	return c.Render("views/deleted", s.templateData(c, fiber.Map{
@@ -955,15 +955,15 @@ func (s *Server) handleDeletedTargets(c *fiber.Ctx) error {
 func (s *Server) handleRestoreTarget(c *fiber.Ctx) error {
 	id, err := strconv.Atoi(c.Params("id"))
 	if err != nil {
-		return c.Status(400).SendString("Invalid ID")
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid ID")
 	}
 
 	err = s.storage.RestoreTarget(c.Context(), id)
 	if err != nil {
 		if errors.Is(err, storage.ErrTargetNotFound) {
-			return c.Status(404).SendString("Target not found")
+			return fiber.NewError(fiber.StatusNotFound, "Target not found")
 		}
-		return c.Status(500).SendString(err.Error())
+		return err
 	}
 
 	return c.Redirect("/targets/deleted")
@@ -972,15 +972,15 @@ func (s *Server) handleRestoreTarget(c *fiber.Ctx) error {
 func (s *Server) handlePurgeTarget(c *fiber.Ctx) error {
 	id, err := strconv.Atoi(c.Params("id"))
 	if err != nil {
-		return c.Status(400).SendString("Invalid ID")
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid ID")
 	}
 
 	err = s.storage.PurgeTarget(c.Context(), id)
 	if err != nil {
 		if errors.Is(err, storage.ErrTargetNotFound) {
-			return c.Status(404).SendString("Target not found")
+			return fiber.NewError(fiber.StatusNotFound, "Target not found")
 		}
-		return c.Status(500).SendString(err.Error())
+		return err
 	}
 
 	return c.Redirect("/targets/deleted")
@@ -1002,17 +1002,17 @@ func (s *Server) handleImportSubmit(c *fiber.Ctx) error {
 		input := c.FormValue("manual_input")
 		src = &importer.ManualSource{Input: input}
 	default:
-		return c.Status(400).SendString("Invalid source type")
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid source type")
 	}
 
 	targets, err := src.Fetch(c.Context())
 	if err != nil {
-		return c.Status(500).SendString(err.Error())
+		return err
 	}
 
 	res, err := s.storage.ImportTargetsReport(c.Context(), targets)
 	if err != nil {
-		return c.Status(500).SendString(err.Error())
+		return err
 	}
 
 	// Re-render the form with the result so the user sees what happened; the
@@ -1054,6 +1054,31 @@ func (s *Server) handleSettings(c *fiber.Ctx) error {
 	return c.Render("views/settings", s.settingsData(c, nil), "views/layouts/main")
 }
 
+// userError turns an error from a settings action into a message that is
+// safe to show: a missing row and a taken name get a sentence, auth's
+// user-facing validation errors keep theirs, and anything else is logged
+// and genericised so driver errors never reach the page.
+func userError(action string, err error) string {
+	switch {
+	case ent.IsNotFound(err):
+		return "Failed to " + action + ": it no longer exists"
+	case ent.IsConstraintError(err):
+		// Driver messages name the column: SQLite says
+		// "UNIQUE constraint failed: tags.name", Postgres
+		// `unique constraint "tags_name_key"`.
+		msg := strings.ToLower(err.Error())
+		if strings.Contains(msg, "name") && strings.Contains(msg, "unique") {
+			return "Failed to " + action + ": an entry with that name already exists"
+		}
+		return "Failed to " + action + ": it conflicts with an existing entry"
+	case errors.Is(err, auth.ErrEmailTaken) || errors.Is(err, auth.ErrNotAllowed):
+		return "Failed to " + action + ": " + err.Error()
+	default:
+		log.Printf("%s: %v", action, err)
+		return "Failed to " + action + ". Check the server log for details."
+	}
+}
+
 func (s *Server) handleInvite(c *fiber.Ctx) error {
 	u := auth.GetUser(c)
 	email := c.FormValue("email")
@@ -1070,7 +1095,7 @@ func (s *Server) handleInvite(c *fiber.Ctx) error {
 	token, err := s.auth.CreateInvite(c.Context(), u, email, inviteRole)
 	if err != nil {
 		return c.Render("views/settings", s.settingsData(c, fiber.Map{
-			"Error": "Failed to create invite: " + err.Error(),
+			"Error": userError("create invite", err),
 		}), "views/layouts/main")
 	}
 
@@ -1089,7 +1114,7 @@ func (s *Server) handleUsers(c *fiber.Ctx) error {
 func (s *Server) handleDeleteUser(c *fiber.Ctx) error {
 	id, err := strconv.Atoi(c.Params("id"))
 	if err != nil {
-		return c.Status(400).SendString("Invalid ID")
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid ID")
 	}
 
 	// Don't allow deleting yourself
@@ -1102,7 +1127,7 @@ func (s *Server) handleDeleteUser(c *fiber.Ctx) error {
 
 	if err := s.auth.DeleteUser(c.Context(), id); err != nil {
 		if ent.IsNotFound(err) {
-			return c.Status(404).SendString("User not found")
+			return fiber.NewError(fiber.StatusNotFound, "User not found")
 		}
 		log.Printf("delete user %d: %v", id, err)
 		return c.Render("views/settings", s.settingsData(c, fiber.Map{
@@ -1138,7 +1163,7 @@ func (s *Server) handleCreateImporter(c *fiber.Ctx) error {
 		Save(c.Context())
 	if err != nil {
 		return c.Render("views/settings", s.settingsData(c, fiber.Map{
-			"Error": "Failed to create importer: " + err.Error(),
+			"Error": userError("create importer", err),
 		}), "views/layouts/main")
 	}
 
@@ -1148,12 +1173,12 @@ func (s *Server) handleCreateImporter(c *fiber.Ctx) error {
 func (s *Server) handleDeleteImporter(c *fiber.Ctx) error {
 	id, err := strconv.Atoi(c.Params("id"))
 	if err != nil {
-		return c.Status(400).SendString("Invalid ID")
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid ID")
 	}
 
 	if err := s.client.ImporterConfig.DeleteOneID(id).Exec(c.Context()); err != nil {
 		return c.Render("views/settings", s.settingsData(c, fiber.Map{
-			"Error": "Failed to delete importer: " + err.Error(),
+			"Error": userError("delete importer", err),
 		}), "views/layouts/main")
 	}
 
@@ -1163,16 +1188,16 @@ func (s *Server) handleDeleteImporter(c *fiber.Ctx) error {
 func (s *Server) handleToggleImporter(c *fiber.Ctx) error {
 	id, err := strconv.Atoi(c.Params("id"))
 	if err != nil {
-		return c.Status(400).SendString("Invalid ID")
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid ID")
 	}
 
 	cfg, err := s.client.ImporterConfig.Get(c.Context(), id)
 	if err != nil {
-		return c.Status(404).SendString("Importer not found")
+		return fiber.NewError(fiber.StatusNotFound, "Importer not found")
 	}
 
 	if err := s.client.ImporterConfig.UpdateOne(cfg).SetEnabled(!cfg.Enabled).Exec(c.Context()); err != nil {
-		return c.Status(500).SendString("Failed to toggle importer")
+		return err
 	}
 	return c.Redirect("/settings")
 }
@@ -1188,15 +1213,15 @@ func (s *Server) handleSyncImporter(c *fiber.Ctx) error {
 
 	id, err := strconv.Atoi(c.Params("id"))
 	if err != nil {
-		return c.Status(400).SendString("Invalid ID")
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid ID")
 	}
 
 	cfg, err := s.client.ImporterConfig.Get(c.Context(), id)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return c.Status(404).SendString("Importer not found")
+			return fiber.NewError(fiber.StatusNotFound, "Importer not found")
 		}
-		return c.Status(500).SendString(err.Error())
+		return err
 	}
 
 	// Provider APIs are slow; do not hold the request open forever.
@@ -1300,7 +1325,7 @@ func (s *Server) handleCreateNotifier(c *fiber.Ctx) error {
 	}
 	if _, err := create.Save(c.Context()); err != nil {
 		return c.Render("views/settings", s.settingsData(c, fiber.Map{
-			"Error": "Failed to create notifier: " + err.Error(),
+			"Error": userError("create notifier", err),
 		}), "views/layouts/main")
 	}
 
@@ -1310,12 +1335,12 @@ func (s *Server) handleCreateNotifier(c *fiber.Ctx) error {
 func (s *Server) handleDeleteNotifier(c *fiber.Ctx) error {
 	id, err := strconv.Atoi(c.Params("id"))
 	if err != nil {
-		return c.Status(400).SendString("Invalid ID")
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid ID")
 	}
 
 	if err := s.client.NotifierConfig.DeleteOneID(id).Exec(c.Context()); err != nil {
 		return c.Render("views/settings", s.settingsData(c, fiber.Map{
-			"Error": "Failed to delete notifier: " + err.Error(),
+			"Error": userError("delete notifier", err),
 		}), "views/layouts/main")
 	}
 
@@ -1325,16 +1350,16 @@ func (s *Server) handleDeleteNotifier(c *fiber.Ctx) error {
 func (s *Server) handleToggleNotifier(c *fiber.Ctx) error {
 	id, err := strconv.Atoi(c.Params("id"))
 	if err != nil {
-		return c.Status(400).SendString("Invalid ID")
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid ID")
 	}
 
 	cfg, err := s.client.NotifierConfig.Get(c.Context(), id)
 	if err != nil {
-		return c.Status(404).SendString("Notifier not found")
+		return fiber.NewError(fiber.StatusNotFound, "Notifier not found")
 	}
 
 	if err := s.client.NotifierConfig.UpdateOne(cfg).SetEnabled(!cfg.Enabled).Exec(c.Context()); err != nil {
-		return c.Status(500).SendString("Failed to toggle notifier")
+		return err
 	}
 	return c.Redirect("/settings")
 }
@@ -1354,7 +1379,7 @@ func (s *Server) handleCreateTag(c *fiber.Ctx) error {
 		Save(c.Context())
 	if err != nil {
 		return c.Render("views/settings", s.settingsData(c, fiber.Map{
-			"Error": "Failed to create tag: " + err.Error(),
+			"Error": userError("create tag", err),
 		}), "views/layouts/main")
 	}
 
@@ -1364,12 +1389,12 @@ func (s *Server) handleCreateTag(c *fiber.Ctx) error {
 func (s *Server) handleDeleteTag(c *fiber.Ctx) error {
 	id, err := strconv.Atoi(c.Params("id"))
 	if err != nil {
-		return c.Status(400).SendString("Invalid ID")
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid ID")
 	}
 
 	if err := s.client.Tag.DeleteOneID(id).Exec(c.Context()); err != nil {
 		return c.Render("views/settings", s.settingsData(c, fiber.Map{
-			"Error": "Failed to delete tag: " + err.Error(),
+			"Error": userError("delete tag", err),
 		}), "views/layouts/main")
 	}
 
@@ -1379,12 +1404,12 @@ func (s *Server) handleDeleteTag(c *fiber.Ctx) error {
 func (s *Server) handleUpdateTargetTags(c *fiber.Ctx) error {
 	id, err := strconv.Atoi(c.Params("id"))
 	if err != nil {
-		return c.Status(400).SendString("Invalid ID")
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid ID")
 	}
 
 	t, err := s.client.Target.Get(c.Context(), id)
 	if err != nil {
-		return c.Status(404).SendString("Target not found")
+		return fiber.NewError(fiber.StatusNotFound, "Target not found")
 	}
 
 	// Get selected tag IDs from form. A bad or unknown id rejects the whole
@@ -1395,7 +1420,7 @@ func (s *Server) handleUpdateTargetTags(c *fiber.Ctx) error {
 	for _, raw := range tagIDs {
 		tid, err := strconv.Atoi(string(raw))
 		if err != nil {
-			return c.Status(400).SendString("Invalid tag id")
+			return fiber.NewError(fiber.StatusBadRequest, "Invalid tag id")
 		}
 		if !seen[tid] {
 			seen[tid] = true
@@ -1405,17 +1430,17 @@ func (s *Server) handleUpdateTargetTags(c *fiber.Ctx) error {
 	if len(ids) > 0 {
 		found, err := s.client.Tag.Query().Where(tag.IDIn(ids...)).All(c.Context())
 		if err != nil {
-			return c.Status(500).SendString("Failed to load tags")
+			return err
 		}
 		if len(found) != len(ids) {
-			return c.Status(400).SendString("Unknown tag")
+			return fiber.NewError(fiber.StatusBadRequest, "Unknown tag")
 		}
 	}
 
 	// Clear existing tags and set the new ones in one update; no values
 	// clears all tags.
 	if err := s.client.Target.UpdateOne(t).ClearTags().AddTagIDs(ids...).Exec(c.Context()); err != nil {
-		return c.Status(500).SendString("Failed to update tags")
+		return err
 	}
 
 	return c.Redirect(fmt.Sprintf("/targets/%d", id))
@@ -1550,15 +1575,15 @@ func exportCSVRows(d exportData) [][]string {
 func (s *Server) handleExportTarget(c *fiber.Ctx) error {
 	id, err := strconv.Atoi(c.Params("id"))
 	if err != nil {
-		return c.Status(400).SendString("Invalid ID")
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid ID")
 	}
 
 	t, err := s.storage.GetTarget(c.Context(), id)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return c.Status(404).SendString("Target not found")
+			return fiber.NewError(fiber.StatusNotFound, "Target not found")
 		}
-		return c.Status(500).SendString(err.Error())
+		return err
 	}
 
 	format := c.Query("format", "json")
@@ -1574,7 +1599,7 @@ func (s *Server) handleExportTarget(c *fiber.Ctx) error {
 		var buf bytes.Buffer
 		w := csv.NewWriter(&buf)
 		if err := w.WriteAll(rows); err != nil {
-			return c.Status(500).SendString("Failed to write CSV")
+			return err
 		}
 		return c.Send(buf.Bytes())
 
@@ -1594,13 +1619,14 @@ type badRequest struct{ msg string }
 
 func (e badRequest) Error() string { return e.msg }
 
-// bulkError writes the response for an error from bulkSelection.
-func bulkError(c *fiber.Ctx, err error) error {
+// bulkError maps an error from bulkSelection to a response: a badRequest is
+// a 400 with its message, anything else goes to the error handler.
+func bulkError(err error) error {
 	var bad badRequest
 	if errors.As(err, &bad) {
-		return c.Status(400).SendString(bad.msg)
+		return fiber.NewError(fiber.StatusBadRequest, bad.msg)
 	}
-	return c.Status(500).SendString(err.Error())
+	return err
 }
 
 // bulkSelection resolves the targets a bulk request acts on. With form value
@@ -1655,12 +1681,12 @@ func (s *Server) handleBulkExport(c *fiber.Ctx) error {
 		format = "json"
 	}
 	if format != "json" && format != "csv" {
-		return c.Status(400).SendString("Invalid format")
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid format")
 	}
 
 	ids, err := s.bulkSelection(c)
 	if err != nil {
-		return bulkError(c, err)
+		return bulkError(err)
 	}
 
 	// The stream writer runs after this handler returns, when c has been
@@ -1752,7 +1778,7 @@ const bulkDeletePreview = 20
 func (s *Server) handleBulkDelete(c *fiber.Ctx) error {
 	ids, err := s.bulkSelection(c)
 	if err != nil {
-		return bulkError(c, err)
+		return bulkError(err)
 	}
 
 	if string(c.Request().PostArgs().Peek("confirm")) != "1" {
@@ -1760,7 +1786,7 @@ func (s *Server) handleBulkDelete(c *fiber.Ctx) error {
 	}
 
 	if _, err := s.storage.DeleteTargets(c.Context(), ids); err != nil {
-		return c.Status(500).SendString(err.Error())
+		return err
 	}
 	return c.Redirect("/")
 }
@@ -1772,7 +1798,7 @@ func (s *Server) renderBulkDeleteConfirm(c *fiber.Ctx, ids []int) error {
 		Order(ent.Asc(target.FieldInput)).
 		All(c.Context())
 	if err != nil {
-		return c.Status(500).SendString(err.Error())
+		return err
 	}
 
 	return c.Render("views/bulk_delete", s.templateData(c, fiber.Map{
