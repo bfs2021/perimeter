@@ -135,38 +135,41 @@ func (s *Server) setupRoutes() {
 		s.app.Get("/auth/callback", s.handleOIDCCallback)
 	}
 
-	// Authenticated routes
+	// Authenticated routes. Role checks are attached per route, not as a
+	// sub-group at "", so an authenticated non-admin on an unknown path
+	// gets a 404 instead of a 403.
 	authed := s.app.Group("", auth.RequireAuth(s.auth))
+	canWrite := auth.RequireRole(user.RoleAdmin, user.RoleMember)
+	adminOnly := auth.RequireRole(user.RoleAdmin)
 	authed.Get("/", s.handleIndex)
 	// Registered before /targets/:id so "deleted" is not read as an id.
 	authed.Get("/targets/deleted", s.handleDeletedTargets)
 	authed.Get("/targets/:id", s.handleTargetDetails)
-	authed.Get("/import", s.handleImport)
-	authed.Post("/import", s.handleImportSubmit)
+	authed.Get("/import", canWrite, s.handleImport)
+	authed.Post("/import", canWrite, s.handleImportSubmit)
 	// Registered before /targets/:id/... so "bulk" is not read as an id.
 	authed.Post("/targets/bulk/export", s.handleBulkExport)
-	authed.Post("/targets/bulk/delete", s.handleBulkDelete)
-	authed.Post("/targets/:id/delete", s.handleDeleteTarget)
-	authed.Post("/targets/:id/restore", s.handleRestoreTarget)
-	authed.Post("/targets/:id/purge", s.handlePurgeTarget)
-	authed.Post("/targets/:id/tags", s.handleUpdateTargetTags)
+	authed.Post("/targets/bulk/delete", canWrite, s.handleBulkDelete)
+	authed.Post("/targets/:id/delete", canWrite, s.handleDeleteTarget)
+	authed.Post("/targets/:id/restore", canWrite, s.handleRestoreTarget)
+	authed.Post("/targets/:id/purge", adminOnly, s.handlePurgeTarget)
+	authed.Post("/targets/:id/tags", canWrite, s.handleUpdateTargetTags)
 	authed.Get("/targets/:id/export", s.handleExportTarget)
 
 	// Admin routes
-	admin := authed.Group("", auth.RequireRole(user.RoleAdmin))
-	admin.Get("/settings", s.handleSettings)
-	admin.Post("/invite", s.handleInvite)
-	admin.Get("/users", s.handleUsers)
-	admin.Post("/users/:id/delete", s.handleDeleteUser)
-	admin.Post("/importers", s.handleCreateImporter)
-	admin.Post("/importers/:id/delete", s.handleDeleteImporter)
-	admin.Post("/importers/:id/toggle", s.handleToggleImporter)
-	admin.Post("/importers/:id/sync", s.handleSyncImporter)
-	admin.Post("/notifiers", s.handleCreateNotifier)
-	admin.Post("/notifiers/:id/delete", s.handleDeleteNotifier)
-	admin.Post("/notifiers/:id/toggle", s.handleToggleNotifier)
-	admin.Post("/tags", s.handleCreateTag)
-	admin.Post("/tags/:id/delete", s.handleDeleteTag)
+	authed.Get("/settings", adminOnly, s.handleSettings)
+	authed.Post("/invite", adminOnly, s.handleInvite)
+	authed.Get("/users", adminOnly, s.handleUsers)
+	authed.Post("/users/:id/delete", adminOnly, s.handleDeleteUser)
+	authed.Post("/importers", adminOnly, s.handleCreateImporter)
+	authed.Post("/importers/:id/delete", adminOnly, s.handleDeleteImporter)
+	authed.Post("/importers/:id/toggle", adminOnly, s.handleToggleImporter)
+	authed.Post("/importers/:id/sync", adminOnly, s.handleSyncImporter)
+	authed.Post("/notifiers", adminOnly, s.handleCreateNotifier)
+	authed.Post("/notifiers/:id/delete", adminOnly, s.handleDeleteNotifier)
+	authed.Post("/notifiers/:id/toggle", adminOnly, s.handleToggleNotifier)
+	authed.Post("/tags", adminOnly, s.handleCreateTag)
+	authed.Post("/tags/:id/delete", adminOnly, s.handleDeleteTag)
 }
 
 // templateData returns a fiber.Map with common template data (user, role).
@@ -175,6 +178,7 @@ func (s *Server) templateData(c *fiber.Ctx, extra fiber.Map) fiber.Map {
 	if u := auth.GetUser(c); u != nil {
 		data["User"] = u
 		data["IsAdmin"] = u.Role == user.RoleAdmin
+		data["CanWrite"] = u.Role == user.RoleAdmin || u.Role == user.RoleMember
 	}
 	for k, v := range extra {
 		data[k] = v
@@ -983,8 +987,11 @@ func (s *Server) handleInvite(c *fiber.Ctx) error {
 	role := c.FormValue("role")
 
 	inviteRole := user.RoleMember
-	if role == "admin" {
+	switch role {
+	case "admin":
 		inviteRole = user.RoleAdmin
+	case "viewer":
+		inviteRole = user.RoleViewer
 	}
 
 	token, err := s.auth.CreateInvite(c.Context(), u, email, inviteRole)

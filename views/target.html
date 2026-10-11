@@ -11,7 +11,7 @@
   {{range .Target.Edges.Tags}}<span class="badge" style="background: {{.Color}}20; color: {{.Color}}; margin-right: 4px;">{{.Name}}</span>{{end}}
 </div>
 
-{{if .AllTags}}
+{{if and .AllTags .CanWrite}}
 <form method="POST" action="/targets/{{.Target.ID}}/tags" style="margin-bottom: 24px;">
   <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
     {{range .AllTags}}

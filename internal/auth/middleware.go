@@ -35,19 +35,20 @@ func RequireAuth(a *Auth) fiber.Handler {
 }
 
 // RequireRole returns middleware that checks the authenticated user has
-// the required role. Must be used after RequireAuth.
-func RequireRole(role user.Role) fiber.Handler {
+// one of the given roles. Must be used after RequireAuth.
+func RequireRole(roles ...user.Role) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		u, ok := c.Locals(UserKey).(*ent.User)
 		if !ok || u == nil {
 			return c.Redirect("/login")
 		}
 
-		if u.Role != role {
-			return c.Status(fiber.StatusForbidden).SendString("Forbidden")
+		for _, role := range roles {
+			if u.Role == role {
+				return c.Next()
+			}
 		}
-
-		return c.Next()
+		return c.Status(fiber.StatusForbidden).SendString("Forbidden")
 	}
 }
 

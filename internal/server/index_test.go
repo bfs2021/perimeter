@@ -54,12 +54,12 @@ var certCellRe = regexp.MustCompile(`(?s)<td>\s*(.*?)\s*</td>`)
 
 // certCellBodies pulls the Cert Expiry column out of each target row. Column
 // 6 (0-based 5) is the cert cell, after the bulk-select checkbox column; the
-// rows are identified by the Delete form.
+// rows are identified by the per-row bulk checkbox.
 func certCellBodies(t *testing.T, html string) []string {
 	t.Helper()
 	var out []string
 	for _, row := range strings.Split(html, "<tr>")[1:] {
-		if !strings.Contains(row, `action="/targets/`) {
+		if !strings.Contains(row, `name="ids"`) {
 			continue
 		}
 		tds := certCellRe.FindAllStringSubmatch(row, -1)

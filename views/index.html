@@ -85,7 +85,9 @@
   <span id="bulk-count" class="text-muted" style="margin-right: 4px;">0 selected</span>
   <button type="submit" name="format" value="json" formaction="/targets/bulk/export" disabled>Export JSON</button>
   <button type="submit" name="format" value="csv" formaction="/targets/bulk/export" disabled>Export CSV</button>
+  {{if .CanWrite}}
   <button type="submit" class="btn-danger" disabled>Delete selected</button>
+  {{end}}
 </form>
 {{if gt .TotalTargets (len .Targets)}}
 <p id="bulk-select-all" class="text-muted" data-total="{{.TotalTargets}}" hidden style="margin: 0 0 12px;">
@@ -200,10 +202,12 @@
       </td>
 
       <td>
+        {{if $.CanWrite}}
         <form method="POST" action="/targets/{{.ID}}/delete"
           onsubmit="return confirm('Delete this target? It can be restored from Deleted targets.');" style="display:inline;">
           <button type="submit" class="btn-danger">Delete</button>
         </form>
+        {{end}}
       </td>
     </tr>
     {{else}}

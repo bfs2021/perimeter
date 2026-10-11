@@ -17,7 +17,7 @@ func (User) Fields() []ent.Field {
 		field.String("name").Default(""),
 		field.String("password_hash").Optional().Nillable(),
 		field.Bool("confirmed").Default(false),
-		field.Enum("role").Values("admin", "member").Default("member"),
+		field.Enum("role").Values("admin", "member", "viewer").Default("member"),
 		field.Time("last_login_at").Optional().Nillable(),
 	}
 }

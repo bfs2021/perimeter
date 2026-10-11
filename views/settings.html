@@ -29,7 +29,8 @@
   <div class="form-group">
     <label for="role">Role</label>
     <select name="role" id="role">
-      <option value="member">Member</option>
+      <option value="viewer">Viewer</option>
+      <option value="member" selected>Member</option>
       <option value="admin">Admin</option>
     </select>
   </div>
@@ -55,7 +56,7 @@
       <td>{{.Name}}</td>
       <td>
         {{if eq .Role.String "admin"}}<span class="badge badge-blue">admin</span>
-        {{else}}<span class="badge badge-gray">member</span>{{end}}
+        {{else}}<span class="badge badge-gray">{{.Role.String}}</span>{{end}}
       </td>
       <td class="text-muted">{{if .LastLoginAt}}{{.LastLoginAt.Format "2006-01-02 15:04"}}{{else}}never{{end}}</td>
       <td>

@@ -85,7 +85,7 @@ var (
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "email", Type: field.TypeString},
 		{Name: "token_hash", Type: field.TypeString, Unique: true},
-		{Name: "role", Type: field.TypeEnum, Enums: []string{"admin", "member"}, Default: "member"},
+		{Name: "role", Type: field.TypeEnum, Enums: []string{"admin", "member", "viewer"}, Default: "member"},
 		{Name: "expires_at", Type: field.TypeTime},
 		{Name: "accepted_at", Type: field.TypeTime, Nullable: true},
 		{Name: "user_invites", Type: field.TypeInt},
@@ -319,7 +319,7 @@ var (
 		{Name: "name", Type: field.TypeString, Default: ""},
 		{Name: "password_hash", Type: field.TypeString, Nullable: true},
 		{Name: "confirmed", Type: field.TypeBool, Default: false},
-		{Name: "role", Type: field.TypeEnum, Enums: []string{"admin", "member"}, Default: "member"},
+		{Name: "role", Type: field.TypeEnum, Enums: []string{"admin", "member", "viewer"}, Default: "member"},
 		{Name: "last_login_at", Type: field.TypeTime, Nullable: true},
 	}
 	// UsersTable holds the schema information for the "users" table.
