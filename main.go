@@ -250,6 +250,7 @@ func main() {
 
 	// 8. Start Web Server
 	srv := server.New(store, authenticator, client, importerRegistry, notifierRegistry, viewsfs, certExpiryWindow, dashboardPageSize)
+	srv.SetImporterSyncer(syncLoop)
 	log.Printf("Perimeter is running on http://localhost:%s", httpPort)
 	log.Fatal(srv.Listen(":" + httpPort))
 }

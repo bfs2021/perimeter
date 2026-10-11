@@ -95,6 +95,67 @@ func (_u *ImporterConfigUpdate) ClearLastSyncAt() *ImporterConfigUpdate {
 	return _u
 }
 
+// SetLastAttemptAt sets the "last_attempt_at" field.
+func (_u *ImporterConfigUpdate) SetLastAttemptAt(v time.Time) *ImporterConfigUpdate {
+	_u.mutation.SetLastAttemptAt(v)
+	return _u
+}
+
+// SetNillableLastAttemptAt sets the "last_attempt_at" field if the given value is not nil.
+func (_u *ImporterConfigUpdate) SetNillableLastAttemptAt(v *time.Time) *ImporterConfigUpdate {
+	if v != nil {
+		_u.SetLastAttemptAt(*v)
+	}
+	return _u
+}
+
+// ClearLastAttemptAt clears the value of the "last_attempt_at" field.
+func (_u *ImporterConfigUpdate) ClearLastAttemptAt() *ImporterConfigUpdate {
+	_u.mutation.ClearLastAttemptAt()
+	return _u
+}
+
+// SetLastError sets the "last_error" field.
+func (_u *ImporterConfigUpdate) SetLastError(v string) *ImporterConfigUpdate {
+	_u.mutation.SetLastError(v)
+	return _u
+}
+
+// SetNillableLastError sets the "last_error" field if the given value is not nil.
+func (_u *ImporterConfigUpdate) SetNillableLastError(v *string) *ImporterConfigUpdate {
+	if v != nil {
+		_u.SetLastError(*v)
+	}
+	return _u
+}
+
+// ClearLastError clears the value of the "last_error" field.
+func (_u *ImporterConfigUpdate) ClearLastError() *ImporterConfigUpdate {
+	_u.mutation.ClearLastError()
+	return _u
+}
+
+// SetConsecutiveFailures sets the "consecutive_failures" field.
+func (_u *ImporterConfigUpdate) SetConsecutiveFailures(v int) *ImporterConfigUpdate {
+	_u.mutation.ResetConsecutiveFailures()
+	_u.mutation.SetConsecutiveFailures(v)
+	return _u
+}
+
+// SetNillableConsecutiveFailures sets the "consecutive_failures" field if the given value is not nil.
+func (_u *ImporterConfigUpdate) SetNillableConsecutiveFailures(v *int) *ImporterConfigUpdate {
+	if v != nil {
+		_u.SetConsecutiveFailures(*v)
+	}
+	return _u
+}
+
+// AddConsecutiveFailures adds value to the "consecutive_failures" field.
+func (_u *ImporterConfigUpdate) AddConsecutiveFailures(v int) *ImporterConfigUpdate {
+	_u.mutation.AddConsecutiveFailures(v)
+	return _u
+}
+
 // SetEnabled sets the "enabled" field.
 func (_u *ImporterConfigUpdate) SetEnabled(v bool) *ImporterConfigUpdate {
 	_u.mutation.SetEnabled(v)
@@ -193,6 +254,24 @@ func (_u *ImporterConfigUpdate) sqlSave(ctx context.Context) (_node int, err err
 	if _u.mutation.LastSyncAtCleared() {
 		_spec.ClearField(importerconfig.FieldLastSyncAt, field.TypeTime)
 	}
+	if value, ok := _u.mutation.LastAttemptAt(); ok {
+		_spec.SetField(importerconfig.FieldLastAttemptAt, field.TypeTime, value)
+	}
+	if _u.mutation.LastAttemptAtCleared() {
+		_spec.ClearField(importerconfig.FieldLastAttemptAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.LastError(); ok {
+		_spec.SetField(importerconfig.FieldLastError, field.TypeString, value)
+	}
+	if _u.mutation.LastErrorCleared() {
+		_spec.ClearField(importerconfig.FieldLastError, field.TypeString)
+	}
+	if value, ok := _u.mutation.ConsecutiveFailures(); ok {
+		_spec.SetField(importerconfig.FieldConsecutiveFailures, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedConsecutiveFailures(); ok {
+		_spec.AddField(importerconfig.FieldConsecutiveFailures, field.TypeInt, value)
+	}
 	if value, ok := _u.mutation.Enabled(); ok {
 		_spec.SetField(importerconfig.FieldEnabled, field.TypeBool, value)
 	}
@@ -280,6 +359,67 @@ func (_u *ImporterConfigUpdateOne) SetNillableLastSyncAt(v *time.Time) *Importer
 // ClearLastSyncAt clears the value of the "last_sync_at" field.
 func (_u *ImporterConfigUpdateOne) ClearLastSyncAt() *ImporterConfigUpdateOne {
 	_u.mutation.ClearLastSyncAt()
+	return _u
+}
+
+// SetLastAttemptAt sets the "last_attempt_at" field.
+func (_u *ImporterConfigUpdateOne) SetLastAttemptAt(v time.Time) *ImporterConfigUpdateOne {
+	_u.mutation.SetLastAttemptAt(v)
+	return _u
+}
+
+// SetNillableLastAttemptAt sets the "last_attempt_at" field if the given value is not nil.
+func (_u *ImporterConfigUpdateOne) SetNillableLastAttemptAt(v *time.Time) *ImporterConfigUpdateOne {
+	if v != nil {
+		_u.SetLastAttemptAt(*v)
+	}
+	return _u
+}
+
+// ClearLastAttemptAt clears the value of the "last_attempt_at" field.
+func (_u *ImporterConfigUpdateOne) ClearLastAttemptAt() *ImporterConfigUpdateOne {
+	_u.mutation.ClearLastAttemptAt()
+	return _u
+}
+
+// SetLastError sets the "last_error" field.
+func (_u *ImporterConfigUpdateOne) SetLastError(v string) *ImporterConfigUpdateOne {
+	_u.mutation.SetLastError(v)
+	return _u
+}
+
+// SetNillableLastError sets the "last_error" field if the given value is not nil.
+func (_u *ImporterConfigUpdateOne) SetNillableLastError(v *string) *ImporterConfigUpdateOne {
+	if v != nil {
+		_u.SetLastError(*v)
+	}
+	return _u
+}
+
+// ClearLastError clears the value of the "last_error" field.
+func (_u *ImporterConfigUpdateOne) ClearLastError() *ImporterConfigUpdateOne {
+	_u.mutation.ClearLastError()
+	return _u
+}
+
+// SetConsecutiveFailures sets the "consecutive_failures" field.
+func (_u *ImporterConfigUpdateOne) SetConsecutiveFailures(v int) *ImporterConfigUpdateOne {
+	_u.mutation.ResetConsecutiveFailures()
+	_u.mutation.SetConsecutiveFailures(v)
+	return _u
+}
+
+// SetNillableConsecutiveFailures sets the "consecutive_failures" field if the given value is not nil.
+func (_u *ImporterConfigUpdateOne) SetNillableConsecutiveFailures(v *int) *ImporterConfigUpdateOne {
+	if v != nil {
+		_u.SetConsecutiveFailures(*v)
+	}
+	return _u
+}
+
+// AddConsecutiveFailures adds value to the "consecutive_failures" field.
+func (_u *ImporterConfigUpdateOne) AddConsecutiveFailures(v int) *ImporterConfigUpdateOne {
+	_u.mutation.AddConsecutiveFailures(v)
 	return _u
 }
 
@@ -410,6 +550,24 @@ func (_u *ImporterConfigUpdateOne) sqlSave(ctx context.Context) (_node *Importer
 	}
 	if _u.mutation.LastSyncAtCleared() {
 		_spec.ClearField(importerconfig.FieldLastSyncAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.LastAttemptAt(); ok {
+		_spec.SetField(importerconfig.FieldLastAttemptAt, field.TypeTime, value)
+	}
+	if _u.mutation.LastAttemptAtCleared() {
+		_spec.ClearField(importerconfig.FieldLastAttemptAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.LastError(); ok {
+		_spec.SetField(importerconfig.FieldLastError, field.TypeString, value)
+	}
+	if _u.mutation.LastErrorCleared() {
+		_spec.ClearField(importerconfig.FieldLastError, field.TypeString)
+	}
+	if value, ok := _u.mutation.ConsecutiveFailures(); ok {
+		_spec.SetField(importerconfig.FieldConsecutiveFailures, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedConsecutiveFailures(); ok {
+		_spec.AddField(importerconfig.FieldConsecutiveFailures, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.Enabled(); ok {
 		_spec.SetField(importerconfig.FieldEnabled, field.TypeBool, value)

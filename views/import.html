@@ -8,6 +8,10 @@
     <select name="source" id="source">
       <option value="manual">Manual List</option>
     </select>
+    <div class="text-muted">
+      Hetzner, Namecheap, Gandi and DNS brute-force importers sync automatically.
+      {{if .IsAdmin}}<a href="/settings#importers">Configure importers in Settings</a>{{end}}
+    </div>
   </div>
 
   <div class="form-group">

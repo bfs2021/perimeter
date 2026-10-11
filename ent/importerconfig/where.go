@@ -79,6 +79,21 @@ func LastSyncAt(v time.Time) predicate.ImporterConfig {
 	return predicate.ImporterConfig(sql.FieldEQ(FieldLastSyncAt, v))
 }
 
+// LastAttemptAt applies equality check predicate on the "last_attempt_at" field. It's identical to LastAttemptAtEQ.
+func LastAttemptAt(v time.Time) predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldEQ(FieldLastAttemptAt, v))
+}
+
+// LastError applies equality check predicate on the "last_error" field. It's identical to LastErrorEQ.
+func LastError(v string) predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldEQ(FieldLastError, v))
+}
+
+// ConsecutiveFailures applies equality check predicate on the "consecutive_failures" field. It's identical to ConsecutiveFailuresEQ.
+func ConsecutiveFailures(v int) predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldEQ(FieldConsecutiveFailures, v))
+}
+
 // Enabled applies equality check predicate on the "enabled" field. It's identical to EnabledEQ.
 func Enabled(v bool) predicate.ImporterConfig {
 	return predicate.ImporterConfig(sql.FieldEQ(FieldEnabled, v))
@@ -312,6 +327,171 @@ func LastSyncAtIsNil() predicate.ImporterConfig {
 // LastSyncAtNotNil applies the NotNil predicate on the "last_sync_at" field.
 func LastSyncAtNotNil() predicate.ImporterConfig {
 	return predicate.ImporterConfig(sql.FieldNotNull(FieldLastSyncAt))
+}
+
+// LastAttemptAtEQ applies the EQ predicate on the "last_attempt_at" field.
+func LastAttemptAtEQ(v time.Time) predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldEQ(FieldLastAttemptAt, v))
+}
+
+// LastAttemptAtNEQ applies the NEQ predicate on the "last_attempt_at" field.
+func LastAttemptAtNEQ(v time.Time) predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldNEQ(FieldLastAttemptAt, v))
+}
+
+// LastAttemptAtIn applies the In predicate on the "last_attempt_at" field.
+func LastAttemptAtIn(vs ...time.Time) predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldIn(FieldLastAttemptAt, vs...))
+}
+
+// LastAttemptAtNotIn applies the NotIn predicate on the "last_attempt_at" field.
+func LastAttemptAtNotIn(vs ...time.Time) predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldNotIn(FieldLastAttemptAt, vs...))
+}
+
+// LastAttemptAtGT applies the GT predicate on the "last_attempt_at" field.
+func LastAttemptAtGT(v time.Time) predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldGT(FieldLastAttemptAt, v))
+}
+
+// LastAttemptAtGTE applies the GTE predicate on the "last_attempt_at" field.
+func LastAttemptAtGTE(v time.Time) predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldGTE(FieldLastAttemptAt, v))
+}
+
+// LastAttemptAtLT applies the LT predicate on the "last_attempt_at" field.
+func LastAttemptAtLT(v time.Time) predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldLT(FieldLastAttemptAt, v))
+}
+
+// LastAttemptAtLTE applies the LTE predicate on the "last_attempt_at" field.
+func LastAttemptAtLTE(v time.Time) predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldLTE(FieldLastAttemptAt, v))
+}
+
+// LastAttemptAtIsNil applies the IsNil predicate on the "last_attempt_at" field.
+func LastAttemptAtIsNil() predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldIsNull(FieldLastAttemptAt))
+}
+
+// LastAttemptAtNotNil applies the NotNil predicate on the "last_attempt_at" field.
+func LastAttemptAtNotNil() predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldNotNull(FieldLastAttemptAt))
+}
+
+// LastErrorEQ applies the EQ predicate on the "last_error" field.
+func LastErrorEQ(v string) predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldEQ(FieldLastError, v))
+}
+
+// LastErrorNEQ applies the NEQ predicate on the "last_error" field.
+func LastErrorNEQ(v string) predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldNEQ(FieldLastError, v))
+}
+
+// LastErrorIn applies the In predicate on the "last_error" field.
+func LastErrorIn(vs ...string) predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldIn(FieldLastError, vs...))
+}
+
+// LastErrorNotIn applies the NotIn predicate on the "last_error" field.
+func LastErrorNotIn(vs ...string) predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldNotIn(FieldLastError, vs...))
+}
+
+// LastErrorGT applies the GT predicate on the "last_error" field.
+func LastErrorGT(v string) predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldGT(FieldLastError, v))
+}
+
+// LastErrorGTE applies the GTE predicate on the "last_error" field.
+func LastErrorGTE(v string) predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldGTE(FieldLastError, v))
+}
+
+// LastErrorLT applies the LT predicate on the "last_error" field.
+func LastErrorLT(v string) predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldLT(FieldLastError, v))
+}
+
+// LastErrorLTE applies the LTE predicate on the "last_error" field.
+func LastErrorLTE(v string) predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldLTE(FieldLastError, v))
+}
+
+// LastErrorContains applies the Contains predicate on the "last_error" field.
+func LastErrorContains(v string) predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldContains(FieldLastError, v))
+}
+
+// LastErrorHasPrefix applies the HasPrefix predicate on the "last_error" field.
+func LastErrorHasPrefix(v string) predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldHasPrefix(FieldLastError, v))
+}
+
+// LastErrorHasSuffix applies the HasSuffix predicate on the "last_error" field.
+func LastErrorHasSuffix(v string) predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldHasSuffix(FieldLastError, v))
+}
+
+// LastErrorIsNil applies the IsNil predicate on the "last_error" field.
+func LastErrorIsNil() predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldIsNull(FieldLastError))
+}
+
+// LastErrorNotNil applies the NotNil predicate on the "last_error" field.
+func LastErrorNotNil() predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldNotNull(FieldLastError))
+}
+
+// LastErrorEqualFold applies the EqualFold predicate on the "last_error" field.
+func LastErrorEqualFold(v string) predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldEqualFold(FieldLastError, v))
+}
+
+// LastErrorContainsFold applies the ContainsFold predicate on the "last_error" field.
+func LastErrorContainsFold(v string) predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldContainsFold(FieldLastError, v))
+}
+
+// ConsecutiveFailuresEQ applies the EQ predicate on the "consecutive_failures" field.
+func ConsecutiveFailuresEQ(v int) predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldEQ(FieldConsecutiveFailures, v))
+}
+
+// ConsecutiveFailuresNEQ applies the NEQ predicate on the "consecutive_failures" field.
+func ConsecutiveFailuresNEQ(v int) predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldNEQ(FieldConsecutiveFailures, v))
+}
+
+// ConsecutiveFailuresIn applies the In predicate on the "consecutive_failures" field.
+func ConsecutiveFailuresIn(vs ...int) predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldIn(FieldConsecutiveFailures, vs...))
+}
+
+// ConsecutiveFailuresNotIn applies the NotIn predicate on the "consecutive_failures" field.
+func ConsecutiveFailuresNotIn(vs ...int) predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldNotIn(FieldConsecutiveFailures, vs...))
+}
+
+// ConsecutiveFailuresGT applies the GT predicate on the "consecutive_failures" field.
+func ConsecutiveFailuresGT(v int) predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldGT(FieldConsecutiveFailures, v))
+}
+
+// ConsecutiveFailuresGTE applies the GTE predicate on the "consecutive_failures" field.
+func ConsecutiveFailuresGTE(v int) predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldGTE(FieldConsecutiveFailures, v))
+}
+
+// ConsecutiveFailuresLT applies the LT predicate on the "consecutive_failures" field.
+func ConsecutiveFailuresLT(v int) predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldLT(FieldConsecutiveFailures, v))
+}
+
+// ConsecutiveFailuresLTE applies the LTE predicate on the "consecutive_failures" field.
+func ConsecutiveFailuresLTE(v int) predicate.ImporterConfig {
+	return predicate.ImporterConfig(sql.FieldLTE(FieldConsecutiveFailures, v))
 }
 
 // EnabledEQ applies the EQ predicate on the "enabled" field.

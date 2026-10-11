@@ -32,6 +32,12 @@ import (
 	"github.com/gofiber/template/html/v2"
 )
 
+// importerSyncer runs one importer sync. main wires the background sync
+// loop in; the "Sync now" button calls it.
+type importerSyncer interface {
+	SyncOne(ctx context.Context, cfg *ent.ImporterConfig) (int, error)
+}
+
 type Server struct {
 	app              *fiber.App
 	storage          storage.Storage
@@ -39,6 +45,7 @@ type Server struct {
 	client           *ent.Client
 	registry         *importer.Registry
 	notifierRegistry *notifier.Registry
+	syncer           importerSyncer
 	// certExpiryWindow is how close to expiry a certificate has to be before
 	// the dashboard calls it out.
 	certExpiryWindow time.Duration
@@ -70,6 +77,12 @@ func New(s storage.Storage, a *auth.Auth, client *ent.Client, registry *importer
 
 	srv.setupRoutes()
 	return srv
+}
+
+// SetImporterSyncer enables the "Sync now" button. The loop is created in
+// main, after the server, so it is set here instead of in New.
+func (s *Server) SetImporterSyncer(sy importerSyncer) {
+	s.syncer = sy
 }
 
 // newViewEngine loads the templates from viewsFS and registers the template
@@ -148,6 +161,7 @@ func (s *Server) setupRoutes() {
 	admin.Post("/importers", s.handleCreateImporter)
 	admin.Post("/importers/:id/delete", s.handleDeleteImporter)
 	admin.Post("/importers/:id/toggle", s.handleToggleImporter)
+	admin.Post("/importers/:id/sync", s.handleSyncImporter)
 	admin.Post("/notifiers", s.handleCreateNotifier)
 	admin.Post("/notifiers/:id/delete", s.handleDeleteNotifier)
 	admin.Post("/notifiers/:id/toggle", s.handleToggleNotifier)
@@ -1077,6 +1091,47 @@ func (s *Server) handleToggleImporter(c *fiber.Ctx) error {
 		return c.Status(500).SendString("Failed to toggle importer")
 	}
 	return c.Redirect("/settings")
+}
+
+// handleSyncImporter runs one importer immediately ("Sync now") and shows
+// the result on the settings page.
+func (s *Server) handleSyncImporter(c *fiber.Ctx) error {
+	if s.syncer == nil {
+		return c.Render("views/settings", s.settingsData(c, fiber.Map{
+			"Error": "Sync not available",
+		}), "views/layouts/main")
+	}
+
+	id, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		return c.Status(400).SendString("Invalid ID")
+	}
+
+	cfg, err := s.client.ImporterConfig.Get(c.Context(), id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return c.Status(404).SendString("Importer not found")
+		}
+		return c.Status(500).SendString(err.Error())
+	}
+
+	// Provider APIs are slow; do not hold the request open forever.
+	ctx, cancel := context.WithTimeout(c.Context(), 2*time.Minute)
+	defer cancel()
+	count, err := s.syncer.SyncOne(ctx, cfg)
+	if err != nil {
+		msg := "Sync failed: " + err.Error()
+		if errors.Is(err, importer.ErrSyncRunning) {
+			msg = "Sync already running"
+		}
+		return c.Render("views/settings", s.settingsData(c, fiber.Map{
+			"Error": msg,
+		}), "views/layouts/main")
+	}
+
+	return c.Render("views/settings", s.settingsData(c, fiber.Map{
+		"Success": fmt.Sprintf("Synced %s: %d targets imported", cfg.Provider, count),
+	}), "views/layouts/main")
 }
 
 // --- Notifier handlers ---
