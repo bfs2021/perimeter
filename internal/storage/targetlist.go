@@ -277,6 +277,48 @@ func (s *EntStorage) TargetStats(ctx context.Context, f TargetFilter, now time.T
 	return st, nil
 }
 
+// reachabilityStates is every reachability state, so StateCounts can
+// zero-fill the ones no target is currently in.
+var reachabilityStates = []target.Reachability{
+	target.ReachabilityOk,
+	target.ReachabilityUnreachable,
+	target.ReachabilityUnresolved,
+	target.ReachabilityPending,
+}
+
+// StateCounts counts the targets matching f per reachability state in one
+// GROUP BY reachability query, ignoring f.States: the dashboard's state
+// filter links count every state the other filters still match, so their
+// numbers do not collapse to one row when a state is selected.
+func (s *EntStorage) StateCounts(ctx context.Context, f TargetFilter) (map[target.Reachability]int, error) {
+	f.States = nil
+	preds, err := targetPredicates(f)
+	if err != nil {
+		return nil, err
+	}
+	type stateCount struct {
+		Reachability string
+		Count        int
+	}
+	var rows []stateCount
+	err = s.client.Target.Query().
+		Where(preds...).
+		GroupBy(target.FieldReachability).
+		Aggregate(ent.Count()).
+		Scan(ctx, &rows)
+	if err != nil {
+		return nil, err
+	}
+	counts := make(map[target.Reachability]int, len(reachabilityStates))
+	for _, st := range reachabilityStates {
+		counts[st] = 0
+	}
+	for _, r := range rows {
+		counts[target.Reachability(r.Reachability)] = r.Count
+	}
+	return counts, nil
+}
+
 // IsGrade reports whether g is an SSL Labs grade with a rank, i.e. a valid
 // TargetFilter.SSLBelow value.
 func IsGrade(g string) bool {

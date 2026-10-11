@@ -56,16 +56,11 @@ type Server struct {
 func New(s storage.Storage, a *auth.Auth, client *ent.Client, registry *importer.Registry, notifierReg *notifier.Registry, viewsFS fs.FS, certExpiryWindow time.Duration, dashboardPageSize int) *Server {
 	engine := newViewEngine(viewsFS)
 
-	app := fiber.New(fiber.Config{
-		Views: engine,
-	})
-
 	if dashboardPageSize < 1 {
 		dashboardPageSize = defaultDashboardPageSize
 	}
 
 	srv := &Server{
-		app:               app,
 		storage:           s,
 		auth:              a,
 		client:            client,
@@ -74,6 +69,12 @@ func New(s storage.Storage, a *auth.Auth, client *ent.Client, registry *importer
 		certExpiryWindow:  certExpiryWindow,
 		dashboardPageSize: dashboardPageSize,
 	}
+
+	app := fiber.New(fiber.Config{
+		Views:        engine,
+		ErrorHandler: srv.errorHandler,
+	})
+	srv.app = app
 
 	srv.setupRoutes()
 	return srv
@@ -170,6 +171,10 @@ func (s *Server) setupRoutes() {
 	authed.Post("/notifiers/:id/toggle", adminOnly, s.handleToggleNotifier)
 	authed.Post("/tags", adminOnly, s.handleCreateTag)
 	authed.Post("/tags/:id/delete", adminOnly, s.handleDeleteTag)
+
+	// Catch-all: a path no route claimed renders the 404 page instead of
+	// fiber's plain text. Registered last, so only unmatched paths reach it.
+	s.app.Use(func(c *fiber.Ctx) error { return fiber.ErrNotFound })
 }
 
 // templateData returns a fiber.Map with common template data (user, role).
@@ -184,6 +189,37 @@ func (s *Server) templateData(c *fiber.Ctx, extra fiber.Map) fiber.Map {
 		data[k] = v
 	}
 	return data
+}
+
+// errorHandler renders views/error for every error the app raises, so unknown
+// URLs and 403s get the same look as the rest of the UI.
+func (s *Server) errorHandler(c *fiber.Ctx, err error) error {
+	code := fiber.StatusInternalServerError
+	msg := err.Error()
+	var fe *fiber.Error
+	if errors.As(err, &fe) {
+		code, msg = fe.Code, fe.Message
+	}
+	if code >= 500 {
+		// Internal errors are logged, not shown: they can carry SQL or paths.
+		log.Printf("%s %s: %v", c.Method(), c.Path(), err)
+		msg = "An unexpected error occurred. Check the server log for details."
+	}
+	title := "Something went wrong"
+	switch code {
+	case fiber.StatusNotFound:
+		title = "Page not found"
+	case fiber.StatusForbidden:
+		title = "Forbidden"
+	}
+	if err := c.Status(code).Render("views/error", s.templateData(c, fiber.Map{
+		"ErrorTitle":   title,
+		"ErrorMessage": msg,
+	}), "views/layouts/main"); err != nil {
+		log.Printf("render error page: %v", err)
+		return c.Status(code).SendString(title)
+	}
+	return nil
 }
 
 // --- Auth handlers ---
@@ -485,16 +521,28 @@ type sortHeader struct {
 	Arrow string
 }
 
+// descFirstSorts are the columns whose inactive header link starts
+// descending: for SSL, worst grade first is the useful first click, since the
+// active ascending direction is best grade first.
+var descFirstSorts = map[string]bool{
+	storage.SortSSL: true,
+}
+
 // sortHeaders builds the header link for every sort field. Clicking the
-// active column toggles its direction; clicking another column sorts it asc.
+// active column toggles its direction; clicking another column starts it in
+// its default direction (desc for descFirstSorts, asc for the rest).
 func sortHeaders(q url.Values, cur storage.TargetSort) (map[string]sortHeader, error) {
 	out := make(map[string]sortHeader, len(storage.SortFields))
 	for _, field := range storage.SortFields {
 		dir := "asc"
+		if descFirstSorts[field] {
+			dir = "desc"
+		}
 		var arrow string
 		if field == cur.Field {
 			if cur.Desc {
 				arrow = " ▼"
+				dir = "asc"
 			} else {
 				arrow = " ▲"
 				dir = "desc"
@@ -566,6 +614,17 @@ func (s *Server) handleIndex(c *fiber.Ctx) error {
 		return c.Status(500).SendString(err.Error())
 	}
 
+	// State counts ignore the active state filter, so every state link shows
+	// how many targets the other filters would still match.
+	stateCounts, err := s.storage.StateCounts(ctx, filter)
+	if err != nil {
+		return c.Status(500).SendString(err.Error())
+	}
+	stateTotal := 0
+	for _, n := range stateCounts {
+		stateTotal += n
+	}
+
 	headers, err := sortHeaders(query, sort)
 	if err != nil {
 		return c.Status(500).SendString(err.Error())
@@ -600,6 +659,8 @@ func (s *Server) handleIndex(c *fiber.Ctx) error {
 		"ClearURL":       clearURL,
 		"Pagination":     pag,
 		"TotalTargets":   stats.Total,
+		"StateCounts":    stateCounts,
+		"StateTotal":     stateTotal,
 		"DeletedCount":   deletedCount,
 		"TotalOpenPorts": stats.OpenPorts,
 		"ExpiringCerts":  stats.ExpiringCerts,

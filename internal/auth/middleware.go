@@ -48,7 +48,7 @@ func RequireRole(roles ...user.Role) fiber.Handler {
 				return c.Next()
 			}
 		}
-		return c.Status(fiber.StatusForbidden).SendString("Forbidden")
+		return fiber.ErrForbidden
 	}
 }
 

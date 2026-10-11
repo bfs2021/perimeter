@@ -50,10 +50,27 @@ type fakeStore struct {
 	listCalls  int
 
 	deleted int
+
+	stateCounts map[target.Reachability]int
 }
 
 func (f *fakeStore) CountDeletedTargets(_ context.Context) (int, error) {
 	return f.deleted, nil
+}
+
+// StateCounts zero-fills every state so the template's map lookup never
+// renders <no value>.
+func (f *fakeStore) StateCounts(_ context.Context, _ storage.TargetFilter) (map[target.Reachability]int, error) {
+	out := map[target.Reachability]int{
+		target.ReachabilityOk:          0,
+		target.ReachabilityUnreachable: 0,
+		target.ReachabilityUnresolved:  0,
+		target.ReachabilityPending:     0,
+	}
+	for k, v := range f.stateCounts {
+		out[k] = v
+	}
+	return out, nil
 }
 
 func (f *fakeStore) TargetStats(_ context.Context, filter storage.TargetFilter, _ time.Time, _ time.Duration) (storage.TargetStats, error) {
@@ -213,9 +230,13 @@ func TestSortHeaders(t *testing.T) {
 	if got := headers[storage.SortCSP]; got.URL != "/?dir=asc&sort=csp&tag=prod" || got.Arrow != " ▼" {
 		t.Errorf("active csp header = %+v", got)
 	}
-	// Inactive column: sorts asc, no arrow, page reset.
+	// Inactive columns: start in their default direction (asc for most...
 	if got := headers[storage.SortPorts]; got.URL != "/?dir=asc&sort=ports&tag=prod" || got.Arrow != "" {
 		t.Errorf("inactive ports header = %+v", got)
+	}
+	// ...desc for ssl, where worst grade first is the useful first click).
+	if got := headers[storage.SortSSL]; got.URL != "/?dir=desc&sort=ssl&tag=prod" || got.Arrow != "" {
+		t.Errorf("inactive ssl header = %+v", got)
 	}
 
 	headers, err = sortHeaders(qv("sort", "ssl"), storage.TargetSort{Field: storage.SortSSL})
@@ -251,6 +272,10 @@ func TestHandleIndexPassesFilterSortAndPaging(t *testing.T) {
 		targets: []*ent.Target{{ID: 1, Input: "a.example"}, {ID: 2, Input: "b.example"}},
 		// 120 matching targets at a page size of 50: three pages.
 		stats: storage.TargetStats{Total: 120, OpenPorts: 7, ExpiringCerts: 2, CSPIssues: 5},
+		stateCounts: map[target.Reachability]int{
+			target.ReachabilityOk:      5,
+			target.ReachabilityPending: 1,
+		},
 	}
 	_, body := dashboardGet(t, fake, 50,
 		"state=ok&tag=prod&csp=issues&ssl=A&ssl_below=B&port=443&expiring=7&sort=ports&dir=desc&page=3")
@@ -284,6 +309,11 @@ func TestHandleIndexPassesFilterSortAndPaging(t *testing.T) {
 	}
 	if !strings.Contains(body, `name="ssl_below"`) || !strings.Contains(body, `value="443"`) {
 		t.Errorf("filter form not rendered with current values")
+	}
+	// State filter links show the per-state counts (StateCounts ignores the
+	// active state filter) and the All link their total.
+	if !strings.Contains(body, "All (6)") || !strings.Contains(body, "ok (5)") {
+		t.Errorf("state filter links do not show state counts; body:\n%s", body)
 	}
 }
 
