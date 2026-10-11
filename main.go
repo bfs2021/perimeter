@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"embed"
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -136,7 +135,7 @@ func main() {
 	switch dbDriver {
 	case "sqlite3", "sqlite":
 		// modernc.org/sqlite is pure-Go (no CGO); driver name is "sqlite".
-		db, err = sql.Open("sqlite", fmt.Sprintf("file:%s?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)", dbPath))
+		db, err = sql.Open("sqlite", storage.SQLiteDSN(dbPath))
 		dialEnt = dialect.SQLite
 	case "postgres":
 		if dbDSN == "" {
