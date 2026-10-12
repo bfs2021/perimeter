@@ -253,6 +253,7 @@ func (s *Server) handleResetTOTP(c *fiber.Ctx) error {
 		return c.Redirect("/settings", fiber.StatusSeeOther)
 	}
 
+	s.auditUI(c, "user.2fa_reset", member.Email, "")
 	setFlash(c, flash{Kind: "success", Message: "Two-factor reset for " + member.Email + ". They have been signed out."})
 	return c.Redirect("/settings", fiber.StatusSeeOther)
 }

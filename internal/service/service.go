@@ -35,17 +35,29 @@ func invalid(field, format string, args ...any) error {
 	return &InvalidError{Field: field, Msg: fmt.Sprintf(format, args...)}
 }
 
-// Service answers read queries over targets, scans and changes.
+// Service answers read queries over targets, scans and changes, and makes the
+// writes the API and MCP share with the UI.
 type Service struct {
 	st               storage.Storage
 	client           *ent.Client
 	certExpiryWindow time.Duration
+	// rescanCooldown and sslScanning shape RequestRescan. SetRescanConfig sets
+	// them to the server's values.
+	rescanCooldown time.Duration
+	sslScanning    bool
 }
 
 // New builds a Service. certExpiryWindow is the horizon for "expiring soon",
 // the same one the dashboard uses.
 func New(st storage.Storage, client *ent.Client, certExpiryWindow time.Duration) *Service {
 	return &Service{st: st, client: client, certExpiryWindow: certExpiryWindow}
+}
+
+// SetRescanConfig sets how long a target waits between rescan requests and
+// whether SSL Labs scanning runs. A rescan flags SSL only when it runs.
+func (s *Service) SetRescanConfig(cooldown time.Duration, sslScanning bool) {
+	s.rescanCooldown = cooldown
+	s.sslScanning = sslScanning
 }
 
 // Page is one page of a list. NextOffset is nil on the last page.

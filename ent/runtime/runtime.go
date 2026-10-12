@@ -4,6 +4,7 @@ package runtime
 
 import (
 	"perimeter/ent/apitoken"
+	"perimeter/ent/auditevent"
 	"perimeter/ent/cspscan"
 	"perimeter/ent/datamigration"
 	"perimeter/ent/importerconfig"
@@ -68,6 +69,16 @@ func init() {
 	apitokenDescPrefix := apitokenFields[3].Descriptor()
 	// apitoken.PrefixValidator is a validator for the "prefix" field. It is called by the builders before save.
 	apitoken.PrefixValidator = apitokenDescPrefix.Validators[0].(func(string) error)
+	auditeventFields := schema.AuditEvent{}.Fields()
+	_ = auditeventFields
+	// auditeventDescAt is the schema descriptor for at field.
+	auditeventDescAt := auditeventFields[0].Descriptor()
+	// auditevent.DefaultAt holds the default value on creation for the at field.
+	auditevent.DefaultAt = auditeventDescAt.Default.(func() time.Time)
+	// auditeventDescAction is the schema descriptor for action field.
+	auditeventDescAction := auditeventFields[5].Descriptor()
+	// auditevent.ActionValidator is a validator for the "action" field. It is called by the builders before save.
+	auditevent.ActionValidator = auditeventDescAction.Validators[0].(func(string) error)
 	cspscanFields := schema.CSPScan{}.Fields()
 	_ = cspscanFields
 	// cspscanDescCheckCount is the schema descriptor for check_count field.

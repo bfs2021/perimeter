@@ -20,6 +20,18 @@ func (f APITokenFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, er
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.APITokenMutation", m)
 }
 
+// The AuditEventFunc type is an adapter to allow the use of ordinary
+// function as AuditEvent mutator.
+type AuditEventFunc func(context.Context, *ent.AuditEventMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f AuditEventFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.AuditEventMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.AuditEventMutation", m)
+}
+
 // The CSPScanFunc type is an adapter to allow the use of ordinary
 // function as CSPScan mutator.
 type CSPScanFunc func(context.Context, *ent.CSPScanMutation) (ent.Value, error)

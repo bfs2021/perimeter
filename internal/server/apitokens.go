@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"log"
 	"strconv"
@@ -98,6 +99,8 @@ func (s *Server) handleCreateAPIToken(c *fiber.Ctx) error {
 		return err
 	}
 
+	s.auditUI(c, "token.create", tok.Prefix, tok.Name+", "+tok.Scope.String())
+
 	// The raw token is shown once, so the page must not be cached.
 	c.Set(fiber.HeaderCacheControl, "no-store")
 	return c.Render("views/account_token", s.templateData(c, fiber.Map{
@@ -124,8 +127,10 @@ func (s *Server) revokeAPIToken(c *fiber.Ctx, back string) error {
 		return fiber.NewError(fiber.StatusBadRequest, "Invalid ID")
 	}
 
+	object, detail := s.tokenLabel(c.Context(), id)
 	switch err := s.auth.RevokeAPIToken(c.Context(), id, auth.GetUser(c)); {
 	case err == nil:
+		s.auditUI(c, "token.revoke", object, detail)
 		setFlash(c, flash{Kind: "success", Message: "Token revoked."})
 	case errors.Is(err, auth.ErrTokenInvalid):
 		// The same message for a missing token and someone else's, so the page
@@ -136,6 +141,22 @@ func (s *Server) revokeAPIToken(c *fiber.Ctx, back string) error {
 		setFlash(c, flash{Kind: "error", Message: "Could not revoke the token. Check the server log for details."})
 	}
 	return c.Redirect(back, fiber.StatusSeeOther)
+}
+
+// tokenLabel names a token for an audit row: its prefix, and the email of its
+// owner. A missing token is named by its id.
+func (s *Server) tokenLabel(ctx context.Context, id int) (object, detail string) {
+	tok, err := s.client.APIToken.Query().
+		Where(apitoken.IDEQ(id)).
+		WithUser().
+		Only(ctx)
+	if err != nil {
+		return "token " + strconv.Itoa(id), ""
+	}
+	if tok.Edges.User != nil {
+		detail = "owner " + tok.Edges.User.Email
+	}
+	return tok.Prefix, detail
 }
 
 // tokenRequestError is the form message for a token validation error, or ""

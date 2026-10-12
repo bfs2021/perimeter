@@ -9,6 +9,9 @@ import (
 // APIToken is the predicate function for apitoken builders.
 type APIToken func(*sql.Selector)
 
+// AuditEvent is the predicate function for auditevent builders.
+type AuditEvent func(*sql.Selector)
+
 // CSPScan is the predicate function for cspscan builders.
 type CSPScan func(*sql.Selector)
 

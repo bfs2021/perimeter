@@ -432,4 +432,33 @@ showNotifierFields();
   </tbody>
 </table>
 
+<h2 id="audit">Audit log</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Time</th>
+      <th>Actor</th>
+      <th>Source</th>
+      <th>Action</th>
+      <th>Object</th>
+      <th>Detail</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .AuditEvents}}
+    <tr>
+      <td class="text-muted">{{.At.Format "2006-01-02 15:04"}}</td>
+      <td>{{.ActorEmail}}</td>
+      <td>{{.Source}}{{with .TokenPrefix}} <span class="mono text-muted">{{.}}</span>{{end}}</td>
+      <td class="mono">{{.Action}}</td>
+      <td class="mono">{{.Object}}</td>
+      <td class="text-muted">{{.Detail}}</td>
+    </tr>
+    {{else}}
+    <tr><td colspan="6" class="text-muted">No audit events yet.</td></tr>
+    {{end}}
+  </tbody>
+</table>
+<p><a href="/settings/audit?page=1">All audit events</a></p>
+
 {{template "views/partials/footer" .}}

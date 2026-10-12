@@ -83,6 +83,7 @@ func TestRoleRoutePermissions(t *testing.T) {
 		{"purge target", "POST", "/targets/" + id + "/purge", adminRole},
 		{"update tags", "POST", "/targets/" + id + "/tags", writeRole},
 		{"settings", "GET", "/settings", adminRole},
+		{"audit log", "GET", "/settings/audit", adminRole},
 	}
 	roles := []user.Role{user.RoleViewer, user.RoleMember, user.RoleAdmin}
 	for _, role := range roles {

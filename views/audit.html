@@ -1,0 +1,36 @@
+{{template "views/partials/header" .}}
+
+<h1>Audit log</h1>
+<p class="text-muted" style="margin: -12px 0 20px;">Writes made from the UI, the API and MCP, newest first. Rows stay when the user who made the change is deleted.</p>
+
+{{if .Events}}
+<table>
+  <thead>
+    <tr>
+      <th>Time</th>
+      <th>Actor</th>
+      <th>Source</th>
+      <th>Action</th>
+      <th>Object</th>
+      <th>Detail</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .Events}}
+    <tr>
+      <td class="text-muted">{{.At.Format "2006-01-02 15:04:05"}}</td>
+      <td>{{.ActorEmail}}</td>
+      <td>{{.Source}}{{with .TokenPrefix}} <span class="mono text-muted">{{.}}</span>{{end}}</td>
+      <td class="mono">{{.Action}}</td>
+      <td class="mono">{{.Object}}</td>
+      <td class="text-muted">{{.Detail}}</td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+{{template "views/partials/pagination" .Pagination}}
+{{else}}
+<p class="text-muted" style="text-align:center; padding:24px;">No audit events yet. <a href="/settings">Back to settings.</a></p>
+{{end}}
+
+{{template "views/partials/footer" .}}

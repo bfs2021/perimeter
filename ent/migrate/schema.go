@@ -36,6 +36,31 @@ var (
 			},
 		},
 	}
+	// AuditEventsColumns holds the columns for the "audit_events" table.
+	AuditEventsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "at", Type: field.TypeTime},
+		{Name: "actor_email", Type: field.TypeString},
+		{Name: "actor_id", Type: field.TypeInt, Nullable: true},
+		{Name: "source", Type: field.TypeEnum, Enums: []string{"ui", "api", "mcp"}},
+		{Name: "token_prefix", Type: field.TypeString, Nullable: true},
+		{Name: "action", Type: field.TypeString},
+		{Name: "object", Type: field.TypeString},
+		{Name: "detail", Type: field.TypeString, Nullable: true},
+	}
+	// AuditEventsTable holds the schema information for the "audit_events" table.
+	AuditEventsTable = &schema.Table{
+		Name:       "audit_events",
+		Columns:    AuditEventsColumns,
+		PrimaryKey: []*schema.Column{AuditEventsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "auditevent_at",
+				Unique:  false,
+				Columns: []*schema.Column{AuditEventsColumns[1]},
+			},
+		},
+	}
 	// CspScansColumns holds the columns for the "csp_scans" table.
 	CspScansColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -466,6 +491,7 @@ var (
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
 		APITokensTable,
+		AuditEventsTable,
 		CspScansTable,
 		DataMigrationsTable,
 		IpsTable,
