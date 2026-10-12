@@ -454,6 +454,21 @@ func TestSummary(t *testing.T) {
 	}
 }
 
+func TestSummaryCountsUnscannedSSL(t *testing.T) {
+	f := newFixture(t)
+	f.target("scanned.test")
+	f.ssl("scanned.test", "A", time.Now().Add(10*24*time.Hour))
+	f.target("bare.test")
+	f.target("gone.test")
+	f.must(f.st.DeleteTarget(f.ctx, f.id("gone.test")))
+
+	s, err := f.svc.Summary(f.ctx, time.Now())
+	f.must(err)
+	if s.Totals.SSLUnscanned != 1 {
+		t.Errorf("ssl_unscanned = %d, want 1 (bare.test, not the deleted one)", s.Totals.SSLUnscanned)
+	}
+}
+
 func TestSummaryRecentChangesAreNewestFirstAndCapped(t *testing.T) {
 	f := newFixture(t)
 	for i := range 25 {

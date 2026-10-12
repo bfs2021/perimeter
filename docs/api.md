@@ -124,10 +124,10 @@ curl -H "Authorization: Bearer prm_..." https://perimeter.example.com/api/v1/sum
 ```
 
 ```json
-{"totals":{"targets":42,"by_reachability":{"ok":38,"pending":1,"unreachable":2,"unresolved":1},"open_ports":57,"csp_issues":11,"expiring_certs":3,"expired_certs":1,"weak_ssl":4},"expiring":[ ... ],"recent_changes":[ ... ]}
+{"totals":{"targets":42,"by_reachability":{"ok":38,"pending":1,"unreachable":2,"unresolved":1},"open_ports":57,"csp_issues":11,"expiring_certs":3,"expired_certs":1,"weak_ssl":4,"ssl_unscanned":2},"ssl_scanning":true,"expiring":[ ... ],"recent_changes":[ ... ]}
 ```
 
-`expiring_certs` counts certificates that are not yet expired but expire within `CERT_EXPIRY_WINDOW` (30 days by default), and `expired_certs` those already expired. `weak_ssl` counts targets graded C or worse, including F, T and M. `expiring` holds target summaries, and `recent_changes` holds changes in the same shape as the change feed.
+`expiring_certs` counts certificates that are not yet expired but expire within `CERT_EXPIRY_WINDOW` (30 days by default), and `expired_certs` those already expired. `weak_ssl` counts targets graded C or worse, including F, T and M. `ssl_unscanned` counts live targets with no SSL grade yet. `ssl_scanning` is `false` when the server has SSL scanning off (no SSL Labs credentials), and then the SSL and certificate totals are always empty. `expiring` holds target summaries, and `recent_changes` holds changes in the same shape as the change feed.
 
 ### GET /api/v1/targets
 

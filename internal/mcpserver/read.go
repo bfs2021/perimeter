@@ -512,6 +512,12 @@ func (t *toolset) summary(ctx context.Context, _ *mcp.CallToolRequest, _ noArgs)
 	fmt.Fprintf(&b, "certificates: %d expiring within %d days, %d expired; weak SSL (below B): %d; open ports: %d; CSP issues: %d\n",
 		tot.ExpiringCerts, int(t.svc.CertExpiryWindow()/(24*time.Hour)), tot.ExpiredCerts,
 		tot.WeakSSL, tot.OpenPorts, tot.CSPIssues)
+	// Say so instead of zero counts reading as "all clean".
+	if !sum.SSLScanning {
+		b.WriteString("SSL scanning is off on this server, so SSL grades and certificate expiry are not checked.\n")
+	} else if tot.SSLUnscanned > 0 {
+		fmt.Fprintf(&b, "SSL not scanned yet: %s\n", countNoun(tot.SSLUnscanned, "target"))
+	}
 	if len(out.WorstSSL) > 0 {
 		b.WriteString("weakest SSL:\n")
 		for _, s := range out.WorstSSL {

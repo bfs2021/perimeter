@@ -80,12 +80,25 @@ func (f *fixture) token(email string, role user.Role, scope apitoken.Scope) (str
 	return raw, u
 }
 
-// connect links an MCP client to the server built for the raw token, in memory.
+// connect links an MCP client to the server the fixture handler serves, in memory.
 func (f *fixture) connect(raw string) *mcp.ClientSession {
+	return f.session(f.h, raw)
+}
+
+// connectOffSSL links to a server whose service has SSL scanning off, as a
+// server without SSL Labs credentials would: no SetRescanConfig, and the
+// field defaults to false.
+func (f *fixture) connectOffSSL(raw string) *mcp.ClientSession {
+	f.t.Helper()
+	return f.session(New(service.New(f.st, f.client, 30*24*time.Hour), f.auth, "test"), raw)
+}
+
+// session links an MCP client to the server the handler serves, in memory.
+func (f *fixture) session(h *Handler, raw string) *mcp.ClientSession {
 	f.t.Helper()
 	u, tok, err := f.auth.ValidateAPIToken(f.ctx, raw)
 	f.must(err)
-	srv := f.h.newServer(u, tok)
+	srv := h.newServer(u, tok)
 	ct, stp := mcp.NewInMemoryTransports()
 	ss, err := srv.Connect(f.ctx, stp, nil)
 	f.must(err)
@@ -284,7 +297,8 @@ func TestReadToolsAgainstSeededData(t *testing.T) {
 
 	t.Run("summary", func(t *testing.T) {
 		res := call(t, cs, "summary", nil)
-		for _, want := range []string{"4 targets", "example.com", "expired.test", "weakest SSL"} {
+		// gone.example has never been SSL scanned, so it is named.
+		for _, want := range []string{"4 targets", "example.com", "expired.test", "weakest SSL", "SSL not scanned yet: 1 target"} {
 			if !strings.Contains(text(res), want) {
 				t.Errorf("summary text lacks %q:\n%s", want, text(res))
 			}
@@ -472,6 +486,20 @@ func TestReadToolsAgainstSeededData(t *testing.T) {
 			t.Errorf("list_tags text: %s", text(res))
 		}
 	})
+}
+
+func TestSummarySaysSSLScanningOff(t *testing.T) {
+	f := newFixture(t)
+	f.seed()
+	raw, _ := f.token("viewer@test.com", user.RoleViewer, apitoken.ScopeRead)
+	cs := f.connectOffSSL(raw)
+	res := call(t, cs, "summary", nil)
+	if !strings.Contains(text(res), "SSL scanning is off") {
+		t.Errorf("summary text lacks the scanning-off note:\n%s", text(res))
+	}
+	if strings.Contains(text(res), "SSL not scanned yet") {
+		t.Errorf("scanning-off summary names unscanned targets:\n%s", text(res))
+	}
 }
 
 func TestWriteToolsAuditAsMCP(t *testing.T) {

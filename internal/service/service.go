@@ -99,7 +99,10 @@ func clampLimit(limit, def, most int) int {
 // Summary is the at-a-glance view: totals, the certificates that will expire
 // soonest, and what changed in the last week.
 type Summary struct {
-	Totals        SummaryTotals   `json:"totals"`
+	Totals SummaryTotals `json:"totals"`
+	// SSLScanning is false when the server has SSL scanning off, and then the
+	// SSL and certificate totals are always empty.
+	SSLScanning   bool            `json:"ssl_scanning"`
 	Expiring      []TargetSummary `json:"expiring"`
 	RecentChanges []Change        `json:"recent_changes"`
 }
@@ -115,6 +118,8 @@ type SummaryTotals struct {
 	ExpiredCerts  int `json:"expired_certs"`
 	// WeakSSL are graded C or worse, including F, T and M.
 	WeakSSL int `json:"weak_ssl"`
+	// SSLUnscanned are the live targets with no SSL grade yet.
+	SSLUnscanned int `json:"ssl_unscanned"`
 }
 
 const (
@@ -143,8 +148,16 @@ func (s *Service) Summary(ctx context.Context, now time.Time) (*Summary, error) 
 	if err != nil {
 		return nil, err
 	}
+	// The default query hides soft-deleted targets, like the count above.
+	unscanned, err := s.client.Target.Query().
+		Where(target.Or(target.LatestSslGradeIsNil(), target.LatestSslGrade(""))).
+		Count(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	out := &Summary{
+		SSLScanning: s.sslScanning,
 		Totals: SummaryTotals{
 			Targets:       stats.Total,
 			OpenPorts:     stats.OpenPorts,
@@ -152,6 +165,7 @@ func (s *Service) Summary(ctx context.Context, now time.Time) (*Summary, error) 
 			ExpiringCerts: stats.ExpiringCerts,
 			ExpiredCerts:  expired,
 			WeakSSL:       weak.Total,
+			SSLUnscanned:  unscanned,
 		},
 		Expiring:      []TargetSummary{},
 		RecentChanges: []Change{},

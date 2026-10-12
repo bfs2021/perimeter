@@ -981,10 +981,13 @@ components:
           description: Pass this back as since to get the changes after this reply.
     Summary:
       type: object
-      required: [totals, expiring, recent_changes]
+      required: [totals, ssl_scanning, expiring, recent_changes]
       properties:
         totals:
           $ref: "#/components/schemas/SummaryTotals"
+        ssl_scanning:
+          type: boolean
+          description: False when the server has SSL scanning off, and then the SSL and certificate totals are always empty.
         expiring:
           type: array
           items:
@@ -995,7 +998,7 @@ components:
             $ref: "#/components/schemas/Change"
     SummaryTotals:
       type: object
-      required: [targets, by_reachability, open_ports, csp_issues, expiring_certs, expired_certs, weak_ssl]
+      required: [targets, by_reachability, open_ports, csp_issues, expiring_certs, expired_certs, weak_ssl, ssl_unscanned]
       properties:
         targets:
           type: integer
@@ -1015,6 +1018,9 @@ components:
         weak_ssl:
           type: integer
           description: Targets graded C or worse, including F, T and M.
+        ssl_unscanned:
+          type: integer
+          description: Live targets with no SSL grade yet.
     ImportRequest:
       type: object
       required: [targets]
