@@ -51,6 +51,8 @@ const (
 	EdgeRecoveryCodes = "recovery_codes"
 	// EdgeLoginChallenges holds the string denoting the login_challenges edge name in mutations.
 	EdgeLoginChallenges = "login_challenges"
+	// EdgeAPITokens holds the string denoting the api_tokens edge name in mutations.
+	EdgeAPITokens = "api_tokens"
 	// Table holds the table name of the user in the database.
 	Table = "users"
 	// TargetsTable is the table that holds the targets relation/edge.
@@ -88,6 +90,13 @@ const (
 	LoginChallengesInverseTable = "login_challenges"
 	// LoginChallengesColumn is the table column denoting the login_challenges relation/edge.
 	LoginChallengesColumn = "user_login_challenges"
+	// APITokensTable is the table that holds the api_tokens relation/edge.
+	APITokensTable = "api_tokens"
+	// APITokensInverseTable is the table name for the APIToken entity.
+	// It exists in this package in order to avoid circular dependency with the "apitoken" package.
+	APITokensInverseTable = "api_tokens"
+	// APITokensColumn is the table column denoting the api_tokens relation/edge.
+	APITokensColumn = "user_api_tokens"
 )
 
 // Columns holds all SQL columns for user fields.
@@ -308,6 +317,20 @@ func ByLoginChallenges(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newLoginChallengesStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
+
+// ByAPITokensCount orders the results by api_tokens count.
+func ByAPITokensCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newAPITokensStep(), opts...)
+	}
+}
+
+// ByAPITokens orders the results by api_tokens terms.
+func ByAPITokens(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newAPITokensStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newTargetsStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -341,5 +364,12 @@ func newLoginChallengesStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(LoginChallengesInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, LoginChallengesTable, LoginChallengesColumn),
+	)
+}
+func newAPITokensStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(APITokensInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, APITokensTable, APITokensColumn),
 	)
 }

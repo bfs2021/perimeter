@@ -90,6 +90,21 @@ func ResolveError(v string) predicate.Target {
 	return predicate.Target(sql.FieldEQ(FieldResolveError, v))
 }
 
+// RescanRequestedAt applies equality check predicate on the "rescan_requested_at" field. It's identical to RescanRequestedAtEQ.
+func RescanRequestedAt(v time.Time) predicate.Target {
+	return predicate.Target(sql.FieldEQ(FieldRescanRequestedAt, v))
+}
+
+// SslRescanPending applies equality check predicate on the "ssl_rescan_pending" field. It's identical to SslRescanPendingEQ.
+func SslRescanPending(v bool) predicate.Target {
+	return predicate.Target(sql.FieldEQ(FieldSslRescanPending, v))
+}
+
+// CspRescanPending applies equality check predicate on the "csp_rescan_pending" field. It's identical to CspRescanPendingEQ.
+func CspRescanPending(v bool) predicate.Target {
+	return predicate.Target(sql.FieldEQ(FieldCspRescanPending, v))
+}
+
 // LatestSslGrade applies equality check predicate on the "latest_ssl_grade" field. It's identical to LatestSslGradeEQ.
 func LatestSslGrade(v string) predicate.Target {
 	return predicate.Target(sql.FieldEQ(FieldLatestSslGrade, v))
@@ -433,6 +448,76 @@ func ResolveErrorEqualFold(v string) predicate.Target {
 // ResolveErrorContainsFold applies the ContainsFold predicate on the "resolve_error" field.
 func ResolveErrorContainsFold(v string) predicate.Target {
 	return predicate.Target(sql.FieldContainsFold(FieldResolveError, v))
+}
+
+// RescanRequestedAtEQ applies the EQ predicate on the "rescan_requested_at" field.
+func RescanRequestedAtEQ(v time.Time) predicate.Target {
+	return predicate.Target(sql.FieldEQ(FieldRescanRequestedAt, v))
+}
+
+// RescanRequestedAtNEQ applies the NEQ predicate on the "rescan_requested_at" field.
+func RescanRequestedAtNEQ(v time.Time) predicate.Target {
+	return predicate.Target(sql.FieldNEQ(FieldRescanRequestedAt, v))
+}
+
+// RescanRequestedAtIn applies the In predicate on the "rescan_requested_at" field.
+func RescanRequestedAtIn(vs ...time.Time) predicate.Target {
+	return predicate.Target(sql.FieldIn(FieldRescanRequestedAt, vs...))
+}
+
+// RescanRequestedAtNotIn applies the NotIn predicate on the "rescan_requested_at" field.
+func RescanRequestedAtNotIn(vs ...time.Time) predicate.Target {
+	return predicate.Target(sql.FieldNotIn(FieldRescanRequestedAt, vs...))
+}
+
+// RescanRequestedAtGT applies the GT predicate on the "rescan_requested_at" field.
+func RescanRequestedAtGT(v time.Time) predicate.Target {
+	return predicate.Target(sql.FieldGT(FieldRescanRequestedAt, v))
+}
+
+// RescanRequestedAtGTE applies the GTE predicate on the "rescan_requested_at" field.
+func RescanRequestedAtGTE(v time.Time) predicate.Target {
+	return predicate.Target(sql.FieldGTE(FieldRescanRequestedAt, v))
+}
+
+// RescanRequestedAtLT applies the LT predicate on the "rescan_requested_at" field.
+func RescanRequestedAtLT(v time.Time) predicate.Target {
+	return predicate.Target(sql.FieldLT(FieldRescanRequestedAt, v))
+}
+
+// RescanRequestedAtLTE applies the LTE predicate on the "rescan_requested_at" field.
+func RescanRequestedAtLTE(v time.Time) predicate.Target {
+	return predicate.Target(sql.FieldLTE(FieldRescanRequestedAt, v))
+}
+
+// RescanRequestedAtIsNil applies the IsNil predicate on the "rescan_requested_at" field.
+func RescanRequestedAtIsNil() predicate.Target {
+	return predicate.Target(sql.FieldIsNull(FieldRescanRequestedAt))
+}
+
+// RescanRequestedAtNotNil applies the NotNil predicate on the "rescan_requested_at" field.
+func RescanRequestedAtNotNil() predicate.Target {
+	return predicate.Target(sql.FieldNotNull(FieldRescanRequestedAt))
+}
+
+// SslRescanPendingEQ applies the EQ predicate on the "ssl_rescan_pending" field.
+func SslRescanPendingEQ(v bool) predicate.Target {
+	return predicate.Target(sql.FieldEQ(FieldSslRescanPending, v))
+}
+
+// SslRescanPendingNEQ applies the NEQ predicate on the "ssl_rescan_pending" field.
+func SslRescanPendingNEQ(v bool) predicate.Target {
+	return predicate.Target(sql.FieldNEQ(FieldSslRescanPending, v))
+}
+
+// CspRescanPendingEQ applies the EQ predicate on the "csp_rescan_pending" field.
+func CspRescanPendingEQ(v bool) predicate.Target {
+	return predicate.Target(sql.FieldEQ(FieldCspRescanPending, v))
+}
+
+// CspRescanPendingNEQ applies the NEQ predicate on the "csp_rescan_pending" field.
+func CspRescanPendingNEQ(v bool) predicate.Target {
+	return predicate.Target(sql.FieldNEQ(FieldCspRescanPending, v))
 }
 
 // ReachabilityEQ applies the EQ predicate on the "reachability" field.

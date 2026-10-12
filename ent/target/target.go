@@ -30,6 +30,12 @@ const (
 	FieldResolveAttempts = "resolve_attempts"
 	// FieldResolveError holds the string denoting the resolve_error field in the database.
 	FieldResolveError = "resolve_error"
+	// FieldRescanRequestedAt holds the string denoting the rescan_requested_at field in the database.
+	FieldRescanRequestedAt = "rescan_requested_at"
+	// FieldSslRescanPending holds the string denoting the ssl_rescan_pending field in the database.
+	FieldSslRescanPending = "ssl_rescan_pending"
+	// FieldCspRescanPending holds the string denoting the csp_rescan_pending field in the database.
+	FieldCspRescanPending = "csp_rescan_pending"
 	// FieldReachability holds the string denoting the reachability field in the database.
 	FieldReachability = "reachability"
 	// FieldLatestSslGrade holds the string denoting the latest_ssl_grade field in the database.
@@ -97,6 +103,9 @@ var Columns = []string{
 	FieldIsIP,
 	FieldResolveAttempts,
 	FieldResolveError,
+	FieldRescanRequestedAt,
+	FieldSslRescanPending,
+	FieldCspRescanPending,
 	FieldReachability,
 	FieldLatestSslGrade,
 	FieldLatestSslGradeRank,
@@ -154,6 +163,10 @@ var (
 	DefaultIsIP bool
 	// DefaultResolveAttempts holds the default value on creation for the "resolve_attempts" field.
 	DefaultResolveAttempts int
+	// DefaultSslRescanPending holds the default value on creation for the "ssl_rescan_pending" field.
+	DefaultSslRescanPending bool
+	// DefaultCspRescanPending holds the default value on creation for the "csp_rescan_pending" field.
+	DefaultCspRescanPending bool
 	// DefaultLatestSslGradeRank holds the default value on creation for the "latest_ssl_grade_rank" field.
 	DefaultLatestSslGradeRank int
 	// DefaultOpenPortCount holds the default value on creation for the "open_port_count" field.
@@ -229,6 +242,21 @@ func ByResolveAttempts(opts ...sql.OrderTermOption) OrderOption {
 // ByResolveError orders the results by the resolve_error field.
 func ByResolveError(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldResolveError, opts...).ToFunc()
+}
+
+// ByRescanRequestedAt orders the results by the rescan_requested_at field.
+func ByRescanRequestedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRescanRequestedAt, opts...).ToFunc()
+}
+
+// BySslRescanPending orders the results by the ssl_rescan_pending field.
+func BySslRescanPending(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSslRescanPending, opts...).ToFunc()
+}
+
+// ByCspRescanPending orders the results by the csp_rescan_pending field.
+func ByCspRescanPending(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCspRescanPending, opts...).ToFunc()
 }
 
 // ByReachability orders the results by the reachability field.

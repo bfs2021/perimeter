@@ -115,6 +115,48 @@ func (_c *TargetCreate) SetNillableResolveError(v *string) *TargetCreate {
 	return _c
 }
 
+// SetRescanRequestedAt sets the "rescan_requested_at" field.
+func (_c *TargetCreate) SetRescanRequestedAt(v time.Time) *TargetCreate {
+	_c.mutation.SetRescanRequestedAt(v)
+	return _c
+}
+
+// SetNillableRescanRequestedAt sets the "rescan_requested_at" field if the given value is not nil.
+func (_c *TargetCreate) SetNillableRescanRequestedAt(v *time.Time) *TargetCreate {
+	if v != nil {
+		_c.SetRescanRequestedAt(*v)
+	}
+	return _c
+}
+
+// SetSslRescanPending sets the "ssl_rescan_pending" field.
+func (_c *TargetCreate) SetSslRescanPending(v bool) *TargetCreate {
+	_c.mutation.SetSslRescanPending(v)
+	return _c
+}
+
+// SetNillableSslRescanPending sets the "ssl_rescan_pending" field if the given value is not nil.
+func (_c *TargetCreate) SetNillableSslRescanPending(v *bool) *TargetCreate {
+	if v != nil {
+		_c.SetSslRescanPending(*v)
+	}
+	return _c
+}
+
+// SetCspRescanPending sets the "csp_rescan_pending" field.
+func (_c *TargetCreate) SetCspRescanPending(v bool) *TargetCreate {
+	_c.mutation.SetCspRescanPending(v)
+	return _c
+}
+
+// SetNillableCspRescanPending sets the "csp_rescan_pending" field if the given value is not nil.
+func (_c *TargetCreate) SetNillableCspRescanPending(v *bool) *TargetCreate {
+	if v != nil {
+		_c.SetCspRescanPending(*v)
+	}
+	return _c
+}
+
 // SetReachability sets the "reachability" field.
 func (_c *TargetCreate) SetReachability(v target.Reachability) *TargetCreate {
 	_c.mutation.SetReachability(v)
@@ -329,6 +371,14 @@ func (_c *TargetCreate) defaults() {
 		v := target.DefaultResolveAttempts
 		_c.mutation.SetResolveAttempts(v)
 	}
+	if _, ok := _c.mutation.SslRescanPending(); !ok {
+		v := target.DefaultSslRescanPending
+		_c.mutation.SetSslRescanPending(v)
+	}
+	if _, ok := _c.mutation.CspRescanPending(); !ok {
+		v := target.DefaultCspRescanPending
+		_c.mutation.SetCspRescanPending(v)
+	}
 	if _, ok := _c.mutation.Reachability(); !ok {
 		v := target.DefaultReachability
 		_c.mutation.SetReachability(v)
@@ -364,6 +414,12 @@ func (_c *TargetCreate) check() error {
 	}
 	if _, ok := _c.mutation.ResolveAttempts(); !ok {
 		return &ValidationError{Name: "resolve_attempts", err: errors.New(`ent: missing required field "Target.resolve_attempts"`)}
+	}
+	if _, ok := _c.mutation.SslRescanPending(); !ok {
+		return &ValidationError{Name: "ssl_rescan_pending", err: errors.New(`ent: missing required field "Target.ssl_rescan_pending"`)}
+	}
+	if _, ok := _c.mutation.CspRescanPending(); !ok {
+		return &ValidationError{Name: "csp_rescan_pending", err: errors.New(`ent: missing required field "Target.csp_rescan_pending"`)}
 	}
 	if _, ok := _c.mutation.Reachability(); !ok {
 		return &ValidationError{Name: "reachability", err: errors.New(`ent: missing required field "Target.reachability"`)}
@@ -432,6 +488,18 @@ func (_c *TargetCreate) createSpec() (*Target, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.ResolveError(); ok {
 		_spec.SetField(target.FieldResolveError, field.TypeString, value)
 		_node.ResolveError = value
+	}
+	if value, ok := _c.mutation.RescanRequestedAt(); ok {
+		_spec.SetField(target.FieldRescanRequestedAt, field.TypeTime, value)
+		_node.RescanRequestedAt = &value
+	}
+	if value, ok := _c.mutation.SslRescanPending(); ok {
+		_spec.SetField(target.FieldSslRescanPending, field.TypeBool, value)
+		_node.SslRescanPending = value
+	}
+	if value, ok := _c.mutation.CspRescanPending(); ok {
+		_spec.SetField(target.FieldCspRescanPending, field.TypeBool, value)
+		_node.CspRescanPending = value
 	}
 	if value, ok := _c.mutation.Reachability(); ok {
 		_spec.SetField(target.FieldReachability, field.TypeEnum, value)

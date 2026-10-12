@@ -6,4 +6,5 @@ docs/superpowers
 .superpowers
 *.md
 !README.md
+!docs/*.md
 .claude/

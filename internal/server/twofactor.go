@@ -117,10 +117,15 @@ func (s *Server) handleAccount(c *fiber.Ctx) error {
 		}
 		recoveryLeft = n
 	}
+	tokens, err := s.auth.ListAPITokens(c.Context(), u.ID)
+	if err != nil {
+		return err
+	}
 
 	return c.Render("views/account", s.templateData(c, fiber.Map{
 		"SSOOnly":      u.PasswordHash == nil,
 		"RecoveryLeft": recoveryLeft,
+		"APITokens":    tokens,
 	}), "views/layouts/main")
 }
 
@@ -248,6 +253,7 @@ func (s *Server) handleResetTOTP(c *fiber.Ctx) error {
 		return c.Redirect("/settings", fiber.StatusSeeOther)
 	}
 
+	s.auditUI(c, "user.2fa_reset", member.Email, "")
 	setFlash(c, flash{Kind: "success", Message: "Two-factor reset for " + member.Email + ". They have been signed out."})
 	return c.Redirect("/settings", fiber.StatusSeeOther)
 }

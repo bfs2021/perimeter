@@ -46,6 +46,9 @@ func (q *DBQueue) Enqueue(ctx context.Context, job Job) error {
 	if job.Address != "" {
 		payload["address"] = job.Address
 	}
+	if job.Fresh {
+		payload["fresh"] = true
+	}
 
 	_, err := q.storage.CreateJob(ctx, jobType, payload)
 	return err
@@ -101,6 +104,9 @@ func entJobToScannerJob(j *ent.Job) Job {
 	}
 	if v, ok := j.Payload["address"].(string); ok {
 		job.Address = v
+	}
+	if v, ok := j.Payload["fresh"].(bool); ok {
+		job.Fresh = v
 	}
 
 	return job

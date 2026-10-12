@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -18,6 +19,12 @@ import (
 func crossOriginProtection() fiber.Handler {
 	cop := http.NewCrossOriginProtection()
 	return func(c *fiber.Ctx) error {
+		// Bearer-token calls skip the check. A browser never attaches an
+		// Authorization header on its own, so these requests can't be forged
+		// cross-site, and API clients may run in a browser. Cookie routes stay checked.
+		if isBearerPath(c.Path()) && c.Get(fiber.HeaderAuthorization) != "" {
+			return c.Next()
+		}
 		req := &http.Request{
 			Method: c.Method(),
 			Host:   string(c.Request().Host()),
@@ -33,4 +40,9 @@ func crossOriginProtection() fiber.Handler {
 		}
 		return c.Next()
 	}
+}
+
+// isBearerPath reports whether path is one of the routes that take bearer tokens.
+func isBearerPath(path string) bool {
+	return strings.HasPrefix(path, "/api/") || path == "/mcp" || strings.HasPrefix(path, "/mcp/")
 }

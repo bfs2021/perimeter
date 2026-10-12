@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"perimeter/ent"
+	"perimeter/ent/apitoken"
 	"perimeter/ent/invite"
 	"perimeter/ent/loginchallenge"
 	"perimeter/ent/recoverycode"
@@ -431,6 +432,11 @@ func (a *Auth) DeleteUser(ctx context.Context, id int) error {
 	}
 	if _, err := tx.LoginChallenge.Delete().
 		Where(loginchallenge.HasUserWith(user.IDEQ(id))).
+		Exec(ctx); err != nil {
+		return rollback(tx, err)
+	}
+	if _, err := tx.APIToken.Delete().
+		Where(apitoken.HasUserWith(user.IDEQ(id))).
 		Exec(ctx); err != nil {
 		return rollback(tx, err)
 	}

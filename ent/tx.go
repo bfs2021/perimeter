@@ -12,6 +12,10 @@ import (
 // Tx is a transactional client that is created by calling Client.Tx().
 type Tx struct {
 	config
+	// APIToken is the client for interacting with the APIToken builders.
+	APIToken *APITokenClient
+	// AuditEvent is the client for interacting with the AuditEvent builders.
+	AuditEvent *AuditEventClient
 	// CSPScan is the client for interacting with the CSPScan builders.
 	CSPScan *CSPScanClient
 	// DataMigration is the client for interacting with the DataMigration builders.
@@ -175,6 +179,8 @@ func (tx *Tx) Client() *Client {
 }
 
 func (tx *Tx) init() {
+	tx.APIToken = NewAPITokenClient(tx.config)
+	tx.AuditEvent = NewAuditEventClient(tx.config)
 	tx.CSPScan = NewCSPScanClient(tx.config)
 	tx.DataMigration = NewDataMigrationClient(tx.config)
 	tx.IP = NewIPClient(tx.config)
@@ -200,7 +206,7 @@ func (tx *Tx) init() {
 // of them in order to commit or rollback the transaction.
 //
 // If a closed transaction is embedded in one of the generated entities, and the entity
-// applies a query, for example: CSPScan.QueryXXX(), the query will be executed
+// applies a query, for example: APIToken.QueryXXX(), the query will be executed
 // through the driver which created this transaction.
 //
 // Note that txDriver is not goroutine safe.

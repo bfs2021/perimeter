@@ -23,6 +23,8 @@ type IP struct {
 	UpdateTime time.Time `json:"update_time,omitempty"`
 	// Address holds the value of the "address" field.
 	Address string `json:"address,omitempty"`
+	// RescanPending holds the value of the "rescan_pending" field.
+	RescanPending bool `json:"rescan_pending,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the IPQuery when eager-loading is set.
 	Edges        IPEdges `json:"edges"`
@@ -63,6 +65,8 @@ func (*IP) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case ip.FieldRescanPending:
+			values[i] = new(sql.NullBool)
 		case ip.FieldID:
 			values[i] = new(sql.NullInt64)
 		case ip.FieldAddress:
@@ -107,6 +111,12 @@ func (_m *IP) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field address", values[i])
 			} else if value.Valid {
 				_m.Address = value.String
+			}
+		case ip.FieldRescanPending:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field rescan_pending", values[i])
+			} else if value.Valid {
+				_m.RescanPending = value.Bool
 			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
@@ -162,6 +172,9 @@ func (_m *IP) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("address=")
 	builder.WriteString(_m.Address)
+	builder.WriteString(", ")
+	builder.WriteString("rescan_pending=")
+	builder.WriteString(fmt.Sprintf("%v", _m.RescanPending))
 	builder.WriteByte(')')
 	return builder.String()
 }

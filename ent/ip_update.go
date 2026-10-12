@@ -50,6 +50,20 @@ func (_u *IPUpdate) SetNillableAddress(v *string) *IPUpdate {
 	return _u
 }
 
+// SetRescanPending sets the "rescan_pending" field.
+func (_u *IPUpdate) SetRescanPending(v bool) *IPUpdate {
+	_u.mutation.SetRescanPending(v)
+	return _u
+}
+
+// SetNillableRescanPending sets the "rescan_pending" field if the given value is not nil.
+func (_u *IPUpdate) SetNillableRescanPending(v *bool) *IPUpdate {
+	if v != nil {
+		_u.SetRescanPending(*v)
+	}
+	return _u
+}
+
 // AddTargetIDs adds the "targets" edge to the Target entity by IDs.
 func (_u *IPUpdate) AddTargetIDs(ids ...int) *IPUpdate {
 	_u.mutation.AddTargetIDs(ids...)
@@ -191,6 +205,9 @@ func (_u *IPUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.Address(); ok {
 		_spec.SetField(ip.FieldAddress, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.RescanPending(); ok {
+		_spec.SetField(ip.FieldRescanPending, field.TypeBool, value)
+	}
 	if _u.mutation.TargetsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2M,
@@ -317,6 +334,20 @@ func (_u *IPUpdateOne) SetAddress(v string) *IPUpdateOne {
 func (_u *IPUpdateOne) SetNillableAddress(v *string) *IPUpdateOne {
 	if v != nil {
 		_u.SetAddress(*v)
+	}
+	return _u
+}
+
+// SetRescanPending sets the "rescan_pending" field.
+func (_u *IPUpdateOne) SetRescanPending(v bool) *IPUpdateOne {
+	_u.mutation.SetRescanPending(v)
+	return _u
+}
+
+// SetNillableRescanPending sets the "rescan_pending" field if the given value is not nil.
+func (_u *IPUpdateOne) SetNillableRescanPending(v *bool) *IPUpdateOne {
+	if v != nil {
+		_u.SetRescanPending(*v)
 	}
 	return _u
 }
@@ -491,6 +522,9 @@ func (_u *IPUpdateOne) sqlSave(ctx context.Context) (_node *IP, err error) {
 	}
 	if value, ok := _u.mutation.Address(); ok {
 		_spec.SetField(ip.FieldAddress, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.RescanPending(); ok {
+		_spec.SetField(ip.FieldRescanPending, field.TypeBool, value)
 	}
 	if _u.mutation.TargetsCleared() {
 		edge := &sqlgraph.EdgeSpec{

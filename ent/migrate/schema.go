@@ -8,6 +8,59 @@ import (
 )
 
 var (
+	// APITokensColumns holds the columns for the "api_tokens" table.
+	APITokensColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "name", Type: field.TypeString, Size: 100},
+		{Name: "scope", Type: field.TypeEnum, Enums: []string{"read", "write"}},
+		{Name: "token_hash", Type: field.TypeString, Unique: true},
+		{Name: "prefix", Type: field.TypeString},
+		{Name: "expires_at", Type: field.TypeTime, Nullable: true},
+		{Name: "last_used_at", Type: field.TypeTime, Nullable: true},
+		{Name: "revoked_at", Type: field.TypeTime, Nullable: true},
+		{Name: "user_api_tokens", Type: field.TypeInt},
+	}
+	// APITokensTable holds the schema information for the "api_tokens" table.
+	APITokensTable = &schema.Table{
+		Name:       "api_tokens",
+		Columns:    APITokensColumns,
+		PrimaryKey: []*schema.Column{APITokensColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "api_tokens_users_api_tokens",
+				Columns:    []*schema.Column{APITokensColumns[10]},
+				RefColumns: []*schema.Column{UsersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+	}
+	// AuditEventsColumns holds the columns for the "audit_events" table.
+	AuditEventsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "at", Type: field.TypeTime},
+		{Name: "actor_email", Type: field.TypeString},
+		{Name: "actor_id", Type: field.TypeInt, Nullable: true},
+		{Name: "source", Type: field.TypeEnum, Enums: []string{"ui", "api", "mcp"}},
+		{Name: "token_prefix", Type: field.TypeString, Nullable: true},
+		{Name: "action", Type: field.TypeString},
+		{Name: "object", Type: field.TypeString},
+		{Name: "detail", Type: field.TypeString, Nullable: true},
+	}
+	// AuditEventsTable holds the schema information for the "audit_events" table.
+	AuditEventsTable = &schema.Table{
+		Name:       "audit_events",
+		Columns:    AuditEventsColumns,
+		PrimaryKey: []*schema.Column{AuditEventsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "auditevent_at",
+				Unique:  false,
+				Columns: []*schema.Column{AuditEventsColumns[1]},
+			},
+		},
+	}
 	// CspScansColumns holds the columns for the "csp_scans" table.
 	CspScansColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -51,6 +104,7 @@ var (
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "address", Type: field.TypeString, Unique: true},
+		{Name: "rescan_pending", Type: field.TypeBool, Default: false},
 	}
 	// IpsTable holds the schema information for the "ips" table.
 	IpsTable = &schema.Table{
@@ -304,6 +358,9 @@ var (
 		{Name: "is_ip", Type: field.TypeBool, Default: false},
 		{Name: "resolve_attempts", Type: field.TypeInt, Default: 0},
 		{Name: "resolve_error", Type: field.TypeString, Nullable: true},
+		{Name: "rescan_requested_at", Type: field.TypeTime, Nullable: true},
+		{Name: "ssl_rescan_pending", Type: field.TypeBool, Default: false},
+		{Name: "csp_rescan_pending", Type: field.TypeBool, Default: false},
 		{Name: "reachability", Type: field.TypeEnum, Enums: []string{"pending", "ok", "unresolved", "unreachable"}, Default: "pending"},
 		{Name: "latest_ssl_grade", Type: field.TypeString, Nullable: true},
 		{Name: "latest_ssl_grade_rank", Type: field.TypeInt, Default: 0},
@@ -320,7 +377,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "targets_users_targets",
-				Columns:    []*schema.Column{TargetsColumns[14]},
+				Columns:    []*schema.Column{TargetsColumns[17]},
 				RefColumns: []*schema.Column{UsersColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -334,27 +391,27 @@ var (
 			{
 				Name:    "target_reachability",
 				Unique:  false,
-				Columns: []*schema.Column{TargetsColumns[8]},
+				Columns: []*schema.Column{TargetsColumns[11]},
 			},
 			{
 				Name:    "target_latest_ssl_grade_rank",
 				Unique:  false,
-				Columns: []*schema.Column{TargetsColumns[10]},
+				Columns: []*schema.Column{TargetsColumns[13]},
 			},
 			{
 				Name:    "target_latest_cert_expiry",
 				Unique:  false,
-				Columns: []*schema.Column{TargetsColumns[11]},
+				Columns: []*schema.Column{TargetsColumns[14]},
 			},
 			{
 				Name:    "target_latest_csp_finding_count",
 				Unique:  false,
-				Columns: []*schema.Column{TargetsColumns[12]},
+				Columns: []*schema.Column{TargetsColumns[15]},
 			},
 			{
 				Name:    "target_open_port_count",
 				Unique:  false,
-				Columns: []*schema.Column{TargetsColumns[13]},
+				Columns: []*schema.Column{TargetsColumns[16]},
 			},
 		},
 	}
@@ -433,6 +490,8 @@ var (
 	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
+		APITokensTable,
+		AuditEventsTable,
 		CspScansTable,
 		DataMigrationsTable,
 		IpsTable,
@@ -455,6 +514,7 @@ var (
 )
 
 func init() {
+	APITokensTable.ForeignKeys[0].RefTable = UsersTable
 	CspScansTable.ForeignKeys[0].RefTable = TargetsTable
 	InvitesTable.ForeignKeys[0].RefTable = UsersTable
 	LoginChallengesTable.ForeignKeys[0].RefTable = UsersTable

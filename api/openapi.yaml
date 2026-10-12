@@ -1,0 +1,1121 @@
+openapi: 3.1.0
+info:
+  title: Perimeter API
+  version: 1.0.0
+  description: |
+    The Perimeter REST API lists and changes the targets that Perimeter watches,
+    and reads their scan results, tags, summary and change feed.
+
+    ## Authentication
+    Send a personal API token as `Authorization: Bearer prm_...`. Create tokens
+    on the Account page of the web UI; the raw token is shown once. Only a
+    SHA-256 hash of it is stored. Session cookies are not accepted on this API.
+    `GET /api/v1/openapi.yaml` is the only route that needs no token.
+
+    ## Scopes and roles
+    A token has the scope `read` or `write`, and the effective permission is the
+    token scope intersected with the role of the user who created it:
+    - read endpoints work with any token;
+    - write endpoints need a `write` token and an `admin` or `member` role.
+    Roles are read on every request, so a demotion applies at once. A role
+    change does not revoke tokens. Tokens are revoked when their user is deleted
+    or when an admin resets the user's two-factor authentication.
+
+    Admin-only operations (users, invites, roles, importers, notifiers, tag
+    creation and deletion, settings) are not part of this API.
+
+    ## Rate limit
+    Each token may make 120 requests per minute. A request over the limit gets
+    `429` with a `Retry-After` header, in seconds.
+
+    ## Pagination
+    List endpoints take `limit` (default 50, maximum 200) and an opaque `cursor`.
+    A reply holds `items`, `total` and, when more pages follow, `next_cursor`.
+    Pass `next_cursor` back as `cursor` to get the next page. Do not parse it.
+
+    ## Change feed
+    `GET /api/v1/changes` takes a required `since` time. Its reply holds `until`,
+    which is the time of the last change returned, or `since` when there were
+    none. To poll, pass `until` back as `since`. When `truncated` is true, the
+    feed has more changes after the ones returned, so poll again straight away.
+
+    ## Idempotency
+    Write endpoints accept an `Idempotency-Key` header of 1 to 255 printable
+    characters. A repeat of a request with the same key, within 24 hours, gets
+    the stored response with the header `Idempotent-Replayed: true`, and no
+    second change is made. Reusing a key with a different request gets `409`.
+    Keys are scoped to the token, and the store is per server process.
+
+    ## Errors
+    Every error has the body `{"error":{"code":"...","message":"..."}}`. Codes:
+    `unauthorized` (401), `forbidden` (403), `not_found` (404),
+    `invalid_request` (400), `rate_limited` (429), `conflict` (409) and
+    `internal` (500).
+servers:
+  - url: /
+    description: The server that serves this document.
+security:
+  - bearerAuth: []
+tags:
+  - name: Account
+    description: The token that made the request.
+  - name: Targets
+    description: Targets, their scans and their lifecycle.
+  - name: Tags
+    description: Tags attached to targets.
+  - name: Summary
+    description: Overview counts and the expiring list.
+  - name: Changes
+    description: The change feed.
+  - name: Spec
+    description: This description.
+paths:
+  /api/v1/openapi.yaml:
+    get:
+      tags: [Spec]
+      operationId: getOpenAPI
+      summary: Get this API description
+      description: Public. It needs no token.
+      security: []
+      responses:
+        "200":
+          description: The OpenAPI 3.1 document.
+          content:
+            application/yaml:
+              schema:
+                type: string
+  /api/v1/me:
+    get:
+      tags: [Account]
+      operationId: getMe
+      summary: Get the user and token of this request
+      responses:
+        "200":
+          description: The user and the token that was used.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/targets:
+    get:
+      tags: [Targets]
+      operationId: listTargets
+      summary: List targets
+      description: |
+        Filters combine with AND. `deleted=true` lists soft-deleted targets
+        instead; then only `q` combines with it, and `limit` and `cursor` still
+        apply.
+      parameters:
+        - $ref: "#/components/parameters/Search"
+        - $ref: "#/components/parameters/Tag"
+        - $ref: "#/components/parameters/State"
+        - $ref: "#/components/parameters/SSLBelow"
+        - $ref: "#/components/parameters/SSLGradeFilter"
+        - $ref: "#/components/parameters/CSP"
+        - $ref: "#/components/parameters/Port"
+        - $ref: "#/components/parameters/ExpiringWithinDays"
+        - $ref: "#/components/parameters/Deleted"
+        - $ref: "#/components/parameters/Sort"
+        - $ref: "#/components/parameters/Order"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: One page of targets.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TargetPage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    post:
+      tags: [Targets]
+      operationId: importTargets
+      summary: Add targets
+      description: |
+        Adds the lines as targets. A line can be a host name or an IP address.
+        Targets that already exist are reported as existing; soft-deleted ones
+        are restored. Lines that are not valid are reported as invalid. Needs a
+        write token.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportRequest"
+      responses:
+        "200":
+          description: What happened to each line.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/targets/{id}:
+    parameters:
+      - $ref: "#/components/parameters/TargetId"
+    get:
+      tags: [Targets]
+      operationId: getTarget
+      summary: Get one target with its newest scans
+      responses:
+        "200":
+          description: The target.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TargetDetail"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    delete:
+      tags: [Targets]
+      operationId: deleteTarget
+      summary: Delete a target (soft delete)
+      description: The target is hidden from lists and can be restored. Needs a write token.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "204":
+          description: The target was deleted.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/targets/{id}/history:
+    parameters:
+      - $ref: "#/components/parameters/TargetId"
+    get:
+      tags: [Targets]
+      operationId: getTargetHistory
+      summary: List the SSL, CSP and port scans of a target, newest first
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: One page of history entries.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HistoryPage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/targets/{id}/tags:
+    parameters:
+      - $ref: "#/components/parameters/TargetId"
+    put:
+      tags: [Tags]
+      operationId: setTargetTags
+      summary: Replace the tags of a target
+      description: Needs a write token. An unknown tag name is 400.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TagsRequest"
+      responses:
+        "200":
+          description: The target with its new tags.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TargetSummary"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    post:
+      tags: [Tags]
+      operationId: addTargetTags
+      summary: Add tags to a target
+      description: Needs a write token. Tags already on the target stay. An unknown tag name is 400.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TagsRequest"
+      responses:
+        "200":
+          description: The target with its tags.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TargetSummary"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/targets/{id}/tags/{tag}:
+    parameters:
+      - $ref: "#/components/parameters/TargetId"
+      - $ref: "#/components/parameters/TagName"
+    delete:
+      tags: [Tags]
+      operationId: removeTargetTag
+      summary: Remove one tag from a target
+      description: Needs a write token.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: The target with its remaining tags.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TargetSummary"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/targets/{id}/restore:
+    parameters:
+      - $ref: "#/components/parameters/TargetId"
+    post:
+      tags: [Targets]
+      operationId: restoreTarget
+      summary: Restore a deleted target
+      description: Needs a write token.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: The restored target.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TargetSummary"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/targets/{id}/rescan:
+    parameters:
+      - $ref: "#/components/parameters/TargetId"
+    post:
+      tags: [Targets]
+      operationId: rescanTarget
+      summary: Ask for a fresh scan of a target
+      description: |
+        Queues a scan for the next producer run. A target can be rescanned once
+        per cooldown; a request inside it gets `cooling_down` and a `Retry-After`
+        header. Needs a write token.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "202":
+          description: The rescan is queued, or the target is cooling down.
+          headers:
+            Retry-After:
+              description: Seconds until the target may be rescanned. Sent only when cooling_down.
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RescanStatus"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/rescan:
+    post:
+      tags: [Targets]
+      operationId: rescanTargets
+      summary: Ask for fresh scans of several targets
+      description: |
+        Queues a rescan for each id. The reply says which were queued, which are
+        cooling down and which do not exist. Needs a write token.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RescanRequest"
+      responses:
+        "202":
+          description: The result for each id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RescanResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/tags:
+    get:
+      tags: [Tags]
+      operationId: listTags
+      summary: List tags with their live target counts
+      responses:
+        "200":
+          description: Every tag, by name.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TagList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/summary:
+    get:
+      tags: [Summary]
+      operationId: getSummary
+      summary: Get totals, the soonest expiring certificates and recent changes
+      responses:
+        "200":
+          description: The summary as of now.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Summary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/changes:
+    get:
+      tags: [Changes]
+      operationId: listChanges
+      summary: List what changed after a time, oldest first
+      description: |
+        Poll with `since` set to the `until` of the previous reply. The first call
+        can use any recent time.
+      parameters:
+        - $ref: "#/components/parameters/Since"
+        - $ref: "#/components/parameters/ChangesLimit"
+      responses:
+        "200":
+          description: The changes after since.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeFeed"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: A personal API token, prm_ followed by 40 characters.
+  parameters:
+    TargetId:
+      name: id
+      in: path
+      required: true
+      description: The target id.
+      schema:
+        type: integer
+        minimum: 1
+    TagName:
+      name: tag
+      in: path
+      required: true
+      description: The tag name.
+      schema:
+        type: string
+    Search:
+      name: q
+      in: query
+      description: Keeps targets whose input contains this text, ignoring case.
+      schema:
+        type: string
+    Tag:
+      name: tag
+      in: query
+      description: Keeps targets that carry the tag with this name.
+      schema:
+        type: string
+    State:
+      name: state
+      in: query
+      description: |
+        Keeps targets in these states. Repeat the parameter or separate the values
+        with commas.
+      explode: true
+      style: form
+      schema:
+        type: array
+        items:
+          type: string
+          enum: [ok, unreachable, unresolved, pending]
+    SSLBelow:
+      name: ssl_below
+      in: query
+      description: Keeps graded targets ranked strictly worse than this grade.
+      schema:
+        $ref: "#/components/schemas/SSLGrade"
+    SSLGradeFilter:
+      name: ssl_grade
+      in: query
+      description: Keeps targets whose newest SSL grade is exactly this.
+      schema:
+        $ref: "#/components/schemas/SSLGrade"
+    CSP:
+      name: csp
+      in: query
+      description: |
+        `issues` keeps targets with CSP findings, `ok` keeps those without, and
+        `none` keeps those with no CSP result.
+      schema:
+        type: string
+        enum: [issues, ok, none]
+    Port:
+      name: port
+      in: query
+      description: Keeps targets where some address has this port open.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 65535
+    ExpiringWithinDays:
+      name: expiring_within_days
+      in: query
+      description: Keeps targets whose certificate expires within this many days. Expired ones are included.
+      schema:
+        type: integer
+        minimum: 0
+    Deleted:
+      name: deleted
+      in: query
+      description: When true, lists soft-deleted targets instead of live ones.
+      schema:
+        type: boolean
+    Sort:
+      name: sort
+      in: query
+      description: |
+        `target` sorts by input, `csp` by CSP finding count, `ports` by open port
+        count, `ssl` by grade (best first when ascending) and `expiry` by
+        certificate expiry (soonest first when ascending).
+      schema:
+        type: string
+        enum: [target, csp, ports, ssl, expiry]
+        default: target
+    Order:
+      name: order
+      in: query
+      description: The sort direction.
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: asc
+    Limit:
+      name: limit
+      in: query
+      description: The page size. Above 200 it is capped at 200.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+    Cursor:
+      name: cursor
+      in: query
+      description: The next_cursor of the previous page. Opaque.
+      schema:
+        type: string
+    Since:
+      name: since
+      in: query
+      required: true
+      description: Only changes observed after this time are listed.
+      schema:
+        type: string
+        format: date-time
+    ChangesLimit:
+      name: limit
+      in: query
+      description: The most changes to return. Default 200, capped at 1000.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: |
+        A client-chosen key, 1 to 255 printable characters, that makes a retry
+        safe. See Idempotency above.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 255
+  responses:
+    BadRequest:
+      description: The request is malformed or has an invalid parameter. The message names the field.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: The bearer token is missing, unknown, revoked or expired.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: The token is read-only, or the user's role cannot change data.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: No such target, or it is soft-deleted.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflict:
+      description: |
+        The Idempotency-Key was used with a different request, or a request with
+        the same key is still in progress.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    RateLimited:
+      description: More than 120 requests in a minute from this token. Wait for Retry-After.
+      headers:
+        Retry-After:
+          description: Seconds to wait before the next request.
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [unauthorized, forbidden, not_found, invalid_request, rate_limited, conflict, internal]
+            message:
+              type: string
+    SSLGrade:
+      type: string
+      enum: ["A+", "A", "A-", "B", "C", "D", "E", "F", "T", "M"]
+    Me:
+      type: object
+      required: [email, name, role, token]
+      properties:
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [admin, member, viewer]
+        token:
+          $ref: "#/components/schemas/MeToken"
+    MeToken:
+      type: object
+      required: [name, scope, prefix]
+      properties:
+        name:
+          type: string
+        scope:
+          type: string
+          enum: [read, write]
+        prefix:
+          type: string
+          description: The first 12 characters of the token, for display.
+        expires_at:
+          type: string
+          format: date-time
+    TargetSummary:
+      type: object
+      required: [id, input, is_ip, reachability, tags, open_ports, created_at]
+      properties:
+        id:
+          type: integer
+        input:
+          type: string
+        is_ip:
+          type: boolean
+        reachability:
+          type: string
+          enum: [ok, unreachable, unresolved, pending]
+        tags:
+          type: array
+          items:
+            type: string
+        ssl_grade:
+          $ref: "#/components/schemas/SSLGrade"
+        cert_expiry:
+          type: string
+          format: date-time
+        cert_days_left:
+          type: integer
+          description: Whole days until the certificate expires; negative once it has.
+        csp_findings:
+          type: integer
+        open_ports:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        deleted_at:
+          type: string
+          format: date-time
+    TargetDetail:
+      allOf:
+        - $ref: "#/components/schemas/TargetSummary"
+        - type: object
+          required: [ips]
+          properties:
+            resolve_error:
+              type: string
+            ips:
+              type: array
+              items:
+                $ref: "#/components/schemas/IPDetail"
+            ssl:
+              $ref: "#/components/schemas/SSLDetail"
+            csp:
+              $ref: "#/components/schemas/CSPDetail"
+    IPDetail:
+      type: object
+      required: [address]
+      properties:
+        address:
+          type: string
+        open_ports:
+          type: array
+          items:
+            type: integer
+        last_checked:
+          type: string
+          format: date-time
+        error:
+          type: string
+    SSLDetail:
+      type: object
+      required: [grade, status, first_seen, last_checked]
+      properties:
+        grade:
+          type: string
+        status:
+          type: string
+        cert_subject:
+          type: string
+        cert_issuer:
+          type: string
+        cert_expiry:
+          type: string
+          format: date-time
+        protocols:
+          type: array
+          items:
+            type: string
+        vulnerabilities:
+          type: array
+          items:
+            type: string
+        first_seen:
+          type: string
+          format: date-time
+        last_checked:
+          type: string
+          format: date-time
+    CSPDetail:
+      type: object
+      required: [first_seen, last_checked]
+      properties:
+        header:
+          type: string
+        findings:
+          type: array
+          items:
+            $ref: "#/components/schemas/CSPFinding"
+        probe_error:
+          type: string
+        first_seen:
+          type: string
+          format: date-time
+        last_checked:
+          type: string
+          format: date-time
+    CSPFinding:
+      type: object
+      description: One finding of the CSP check. Type and severity are the scanner's numeric codes; level names the severity.
+      required: [type, description, severity, level, directive]
+      properties:
+        type:
+          type: integer
+        description:
+          type: string
+        severity:
+          type: integer
+        level:
+          type: string
+          enum: [high, medium, low, info]
+        directive:
+          type: string
+        value:
+          type: string
+    TargetPage:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TargetSummary"
+        total:
+          type: integer
+        next_cursor:
+          type: string
+    HistoryEntry:
+      type: object
+      required: [kind, first_seen, last_checked, summary]
+      properties:
+        kind:
+          type: string
+          enum: [ssl, csp, ports]
+        first_seen:
+          type: string
+          format: date-time
+        last_checked:
+          type: string
+          format: date-time
+        ip:
+          type: string
+        summary:
+          type: string
+        grade:
+          type: string
+        ports:
+          type: array
+          items:
+            type: integer
+        findings_count:
+          type: integer
+        error:
+          type: string
+    HistoryPage:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/HistoryEntry"
+        total:
+          type: integer
+        next_cursor:
+          type: string
+    Tag:
+      type: object
+      required: [id, name, color, target_count]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        color:
+          type: string
+        target_count:
+          type: integer
+    TagList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Tag"
+    Change:
+      type: object
+      required: [at, target_id, target, kind, summary]
+      properties:
+        at:
+          type: string
+          format: date-time
+        target_id:
+          type: integer
+        target:
+          type: string
+        kind:
+          type: string
+          enum:
+            - target_added
+            - target_deleted
+            - ssl_grade_changed
+            - cert_renewed
+            - ports_opened
+            - ports_closed
+            - csp_changed
+            - became_unreachable
+            - became_reachable
+        from:
+          type: string
+        to:
+          type: string
+        ip:
+          type: string
+        summary:
+          type: string
+    ChangeFeed:
+      type: object
+      required: [items, truncated, until]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Change"
+        truncated:
+          type: boolean
+          description: True when more changes followed the ones returned.
+        until:
+          type: string
+          format: date-time
+          description: Pass this back as since to get the changes after this reply.
+    Summary:
+      type: object
+      required: [totals, ssl_scanning, expiring, recent_changes]
+      properties:
+        totals:
+          $ref: "#/components/schemas/SummaryTotals"
+        ssl_scanning:
+          type: boolean
+          description: False when the server has SSL scanning off, and then the SSL and certificate totals are always empty.
+        expiring:
+          type: array
+          items:
+            $ref: "#/components/schemas/TargetSummary"
+        recent_changes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Change"
+    SummaryTotals:
+      type: object
+      required: [targets, by_reachability, open_ports, csp_issues, expiring_certs, expired_certs, weak_ssl, ssl_unscanned]
+      properties:
+        targets:
+          type: integer
+        by_reachability:
+          type: object
+          additionalProperties:
+            type: integer
+        open_ports:
+          type: integer
+        csp_issues:
+          type: integer
+        expiring_certs:
+          type: integer
+          description: Certificates that are not yet expired and expire within the window.
+        expired_certs:
+          type: integer
+        weak_ssl:
+          type: integer
+          description: Targets graded C or worse, including F, T and M.
+        ssl_unscanned:
+          type: integer
+          description: Live targets with no SSL grade yet.
+    ImportRequest:
+      type: object
+      required: [targets]
+      properties:
+        targets:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          items:
+            type: string
+          description: Host names or IP addresses, one per entry.
+    ImportResult:
+      type: object
+      required: [added, existing, restored, invalid, targets]
+      properties:
+        added:
+          type: array
+          items:
+            type: string
+        existing:
+          type: array
+          items:
+            type: string
+        restored:
+          type: array
+          items:
+            type: string
+        invalid:
+          type: array
+          items:
+            type: string
+        targets:
+          type: array
+          description: The targets the valid lines became, in id order.
+          items:
+            $ref: "#/components/schemas/ImportedTarget"
+    ImportedTarget:
+      type: object
+      required: [id, input, status]
+      properties:
+        id:
+          type: integer
+        input:
+          type: string
+        status:
+          type: string
+          enum: [added, existing, restored]
+    TagsRequest:
+      type: object
+      required: [tags]
+      properties:
+        tags:
+          type: array
+          items:
+            type: string
+    RescanStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [queued, cooling_down]
+        retry_at:
+          type: string
+          format: date-time
+          description: When the target may be rescanned again. Set only when cooling_down.
+    RescanRequest:
+      type: object
+      required: [ids]
+      properties:
+        ids:
+          type: array
+          maxItems: 500
+          items:
+            type: integer
+    RescanResult:
+      type: object
+      required: [queued, cooling_down, not_found]
+      properties:
+        queued:
+          type: array
+          items:
+            type: integer
+        cooling_down:
+          type: array
+          items:
+            type: object
+            required: [id, retry_at]
+            properties:
+              id:
+                type: integer
+              retry_at:
+                type: string
+                format: date-time
+        not_found:
+          type: array
+          items:
+            type: integer

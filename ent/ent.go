@@ -6,6 +6,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"perimeter/ent/apitoken"
+	"perimeter/ent/auditevent"
 	"perimeter/ent/cspscan"
 	"perimeter/ent/datamigration"
 	"perimeter/ent/importerconfig"
@@ -88,6 +90,8 @@ var (
 func checkColumn(t, c string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
+			apitoken.Table:       apitoken.ValidColumn,
+			auditevent.Table:     auditevent.ValidColumn,
 			cspscan.Table:        cspscan.ValidColumn,
 			datamigration.Table:  datamigration.ValidColumn,
 			ip.Table:             ip.ValidColumn,

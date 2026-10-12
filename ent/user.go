@@ -61,9 +61,11 @@ type UserEdges struct {
 	RecoveryCodes []*RecoveryCode `json:"recovery_codes,omitempty"`
 	// LoginChallenges holds the value of the login_challenges edge.
 	LoginChallenges []*LoginChallenge `json:"login_challenges,omitempty"`
+	// APITokens holds the value of the api_tokens edge.
+	APITokens []*APIToken `json:"api_tokens,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [5]bool
+	loadedTypes [6]bool
 }
 
 // TargetsOrErr returns the Targets value or an error if the edge
@@ -109,6 +111,15 @@ func (e UserEdges) LoginChallengesOrErr() ([]*LoginChallenge, error) {
 		return e.LoginChallenges, nil
 	}
 	return nil, &NotLoadedError{edge: "login_challenges"}
+}
+
+// APITokensOrErr returns the APITokens value or an error if the edge
+// was not loaded in eager-loading.
+func (e UserEdges) APITokensOrErr() ([]*APIToken, error) {
+	if e.loadedTypes[5] {
+		return e.APITokens, nil
+	}
+	return nil, &NotLoadedError{edge: "api_tokens"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -262,6 +273,11 @@ func (_m *User) QueryRecoveryCodes() *RecoveryCodeQuery {
 // QueryLoginChallenges queries the "login_challenges" edge of the User entity.
 func (_m *User) QueryLoginChallenges() *LoginChallengeQuery {
 	return NewUserClient(_m.config).QueryLoginChallenges(_m)
+}
+
+// QueryAPITokens queries the "api_tokens" edge of the User entity.
+func (_m *User) QueryAPITokens() *APITokenQuery {
+	return NewUserClient(_m.config).QueryAPITokens(_m)
 }
 
 // Update returns a builder for updating this User.

@@ -13,6 +13,7 @@ import (
 	"perimeter/ent/cspscan"
 	"perimeter/ent/ip"
 	"perimeter/ent/portscan"
+	"perimeter/ent/predicate"
 	"perimeter/ent/schema"
 	"perimeter/ent/sslscan"
 	"perimeter/ent/target"
@@ -83,6 +84,10 @@ type Storage interface {
 	// batches, so memory stays bounded however many ids there are. An error
 	// from fn stops the iteration and is returned.
 	EachTargetWithHistory(ctx context.Context, ids []int, fn func(*ent.Target) error) error
+
+	// RequestRescan queues an on-demand scan of the given targets (see
+	// rescan.go).
+	RequestRescan(ctx context.Context, ids []int, now time.Time, cooldown time.Duration, kinds RescanKinds) (RescanResult, error)
 
 	// Scanning Logic
 	GetOldestOutdatedTarget(ctx context.Context, scanType ScanType, threshold time.Duration) (*ent.Target, error)
@@ -356,27 +361,43 @@ func rollback(tx *ent.Tx, err error) error {
 	return err
 }
 
-// GetOldestOutdatedTarget returns targets for SSL/CSP scans
+// GetOldestOutdatedTarget returns the target for the next SSL/CSP scan. A
+// target with a pending rescan comes first, oldest request first; otherwise
+// it is the outdated target that was updated longest ago.
 func (s *EntStorage) GetOldestOutdatedTarget(ctx context.Context, scanType ScanType, threshold time.Duration) (*ent.Target, error) {
 	cutoff := time.Now().Add(-threshold)
-	query := s.client.Target.Query().Where(target.IsIP(false))
+	var pending, outdated predicate.Target
 
 	switch scanType {
 	case ScanTypeSSL:
-		query.Where(target.Or(
+		pending = target.SslRescanPending(true)
+		outdated = target.Or(
 			target.Not(target.HasSslScans()),
 			target.Not(target.HasSslScansWith(sslscan.LastSeenAtGTE(cutoff))),
-		))
+		)
 	case ScanTypeCSP:
-		query.Where(target.Or(
+		pending = target.CspRescanPending(true)
+		outdated = target.Or(
 			target.Not(target.HasCspScans()),
 			target.Not(target.HasCspScansWith(cspscan.LastSeenAtGTE(cutoff))),
-		))
+		)
 	default:
 		return nil, fmt.Errorf("scan type %s not supported for Targets (use GetOutdatedIPs for ports)", scanType)
 	}
 
-	t, err := query.Order(ent.Asc(target.FieldUpdateTime)).First(ctx)
+	base := s.client.Target.Query().Where(target.IsIP(false))
+	t, err := base.Clone().
+		Where(pending).
+		Order(ent.Asc(target.FieldRescanRequestedAt)).
+		First(ctx)
+	if err == nil {
+		return t, nil
+	}
+	if !ent.IsNotFound(err) {
+		return nil, fmt.Errorf("error fetching target: %v", err)
+	}
+
+	t, err = base.Where(outdated).Order(ent.Asc(target.FieldUpdateTime)).First(ctx)
 	if err != nil && !ent.IsNotFound(err) {
 		return nil, fmt.Errorf("error fetching target: %v", err)
 	}
@@ -384,7 +405,8 @@ func (s *EntStorage) GetOldestOutdatedTarget(ctx context.Context, scanType ScanT
 }
 
 // GetOutdatedIPs returns up to limit IPs whose newest port scan is older than
-// threshold (or that were never scanned), oldest first. An IP stays outdated
+// threshold (or that were never scanned), oldest first. IPs with a pending
+// rescan are included even when fresh, and come first. An IP stays outdated
 // until its scan row is written, so returning one row at a time capped the
 // whole port pipeline at one scan in flight regardless of WORKER_COUNT
 // (issue #10).
@@ -396,11 +418,12 @@ func (s *EntStorage) GetOutdatedIPs(ctx context.Context, limit int, threshold ti
 	// keep being port scanned.
 	return s.client.IP.Query().
 		Where(ip.Or(
+			ip.RescanPending(true),
 			ip.Not(ip.HasScans()),
 			ip.Not(ip.HasScansWith(portscan.LastSeenAtGTE(cutoff))),
 		)).
 		Where(ip.HasTargetsWith(target.DeletedAtIsNil())).
-		Order(ip.ByScans(oldestScanFirst())).
+		Order(ip.ByRescanPending(sql.OrderDesc()), ip.ByScans(oldestScanFirst())).
 		Limit(limit).
 		All(ctx)
 }
@@ -529,6 +552,9 @@ func (s *EntStorage) SavePortScan(ctx context.Context, ipAddress string, openPor
 	if err := s.savePortScan(ctx, i, openPorts); err != nil {
 		return err
 	}
+	if err := s.clearIPRescan(ctx, i); err != nil {
+		return err
+	}
 	// An open port makes every target on this IP reachable, domains included.
 	return refreshSummary(ctx, s.client, target.HasIpsWith(ip.ID(i.ID)))
 }
@@ -567,6 +593,9 @@ func (s *EntStorage) SavePortScanError(ctx context.Context, ipAddress, msg strin
 	}
 
 	if err := s.savePortScanError(ctx, i, msg); err != nil {
+		return err
+	}
+	if err := s.clearIPRescan(ctx, i); err != nil {
 		return err
 	}
 	return refreshSummary(ctx, s.client, target.HasIpsWith(ip.ID(i.ID)))
@@ -667,6 +696,9 @@ func (s *EntStorage) SaveSSLScan(ctx context.Context, input string, res SSLResul
 	if err != nil {
 		return rollback(tx, err)
 	}
+	if err := clearTargetRescan(ctx, tx, t.ID, ScanTypeSSL); err != nil {
+		return rollback(tx, err)
+	}
 	if err := refreshSummary(ctx, tx.Client(), target.ID(t.ID)); err != nil {
 		return rollback(tx, err)
 	}
@@ -726,6 +758,9 @@ func (s *EntStorage) saveCSP(ctx context.Context, input, header string, findings
 			Exec(ctx)
 	}
 	if err != nil {
+		return rollback(tx, err)
+	}
+	if err := clearTargetRescan(ctx, tx, t.ID, ScanTypeCSP); err != nil {
 		return rollback(tx, err)
 	}
 	if err := refreshSummary(ctx, tx.Client(), target.ID(t.ID)); err != nil {

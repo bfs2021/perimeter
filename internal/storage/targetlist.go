@@ -25,6 +25,8 @@ import (
 // SQL against the summary columns (issue #14), except Port, which joins
 // through ips -> port_scans -> ports.
 type TargetFilter struct {
+	// Search keeps targets whose input contains it, ignoring case.
+	Search string
 	// States keeps targets in any of these reachability states.
 	States []target.Reachability
 	// Tag keeps targets carrying the tag with this name.
@@ -47,6 +49,8 @@ type TargetFilter struct {
 	// the badge's daysUntil (issue #42). Certificates that already
 	// expired are included. 0 means no constraint.
 	ExpiringWithin time.Duration
+	// Expired keeps targets whose certificate has already expired.
+	Expired bool
 }
 
 // Sort fields accepted by TargetSort.Field.
@@ -101,6 +105,9 @@ var ErrInvalidSort = errors.New("invalid sort field")
 // both use it, so the page and the stat cards always agree on the matches.
 func targetPredicates(f TargetFilter) ([]predicate.Target, error) {
 	var ps []predicate.Target
+	if f.Search != "" {
+		ps = append(ps, target.InputContainsFold(f.Search))
+	}
 	if len(f.States) > 0 {
 		ps = append(ps, target.ReachabilityIn(f.States...))
 	}
@@ -145,6 +152,12 @@ func targetPredicates(f TargetFilter) ([]predicate.Target, error) {
 		ps = append(ps,
 			target.LatestCertExpiryNotNil(),
 			target.LatestCertExpiryLT(time.Now().Add(f.ExpiringWithin+24*time.Hour)),
+		)
+	}
+	if f.Expired {
+		ps = append(ps,
+			target.LatestCertExpiryNotNil(),
+			target.LatestCertExpiryLT(time.Now()),
 		)
 	}
 	return ps, nil

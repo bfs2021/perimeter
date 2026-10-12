@@ -3,6 +3,8 @@
 package runtime
 
 import (
+	"perimeter/ent/apitoken"
+	"perimeter/ent/auditevent"
 	"perimeter/ent/cspscan"
 	"perimeter/ent/datamigration"
 	"perimeter/ent/importerconfig"
@@ -26,6 +28,57 @@ import (
 // (default values, validators, hooks and policies) and stitches it
 // to their package variables.
 func init() {
+	apitokenMixin := schema.APIToken{}.Mixin()
+	apitokenMixinFields0 := apitokenMixin[0].Fields()
+	_ = apitokenMixinFields0
+	apitokenFields := schema.APIToken{}.Fields()
+	_ = apitokenFields
+	// apitokenDescCreateTime is the schema descriptor for create_time field.
+	apitokenDescCreateTime := apitokenMixinFields0[0].Descriptor()
+	// apitoken.DefaultCreateTime holds the default value on creation for the create_time field.
+	apitoken.DefaultCreateTime = apitokenDescCreateTime.Default.(func() time.Time)
+	// apitokenDescUpdateTime is the schema descriptor for update_time field.
+	apitokenDescUpdateTime := apitokenMixinFields0[1].Descriptor()
+	// apitoken.DefaultUpdateTime holds the default value on creation for the update_time field.
+	apitoken.DefaultUpdateTime = apitokenDescUpdateTime.Default.(func() time.Time)
+	// apitoken.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	apitoken.UpdateDefaultUpdateTime = apitokenDescUpdateTime.UpdateDefault.(func() time.Time)
+	// apitokenDescName is the schema descriptor for name field.
+	apitokenDescName := apitokenFields[0].Descriptor()
+	// apitoken.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	apitoken.NameValidator = func() func(string) error {
+		validators := apitokenDescName.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(name string) error {
+			for _, fn := range fns {
+				if err := fn(name); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// apitokenDescTokenHash is the schema descriptor for token_hash field.
+	apitokenDescTokenHash := apitokenFields[2].Descriptor()
+	// apitoken.TokenHashValidator is a validator for the "token_hash" field. It is called by the builders before save.
+	apitoken.TokenHashValidator = apitokenDescTokenHash.Validators[0].(func(string) error)
+	// apitokenDescPrefix is the schema descriptor for prefix field.
+	apitokenDescPrefix := apitokenFields[3].Descriptor()
+	// apitoken.PrefixValidator is a validator for the "prefix" field. It is called by the builders before save.
+	apitoken.PrefixValidator = apitokenDescPrefix.Validators[0].(func(string) error)
+	auditeventFields := schema.AuditEvent{}.Fields()
+	_ = auditeventFields
+	// auditeventDescAt is the schema descriptor for at field.
+	auditeventDescAt := auditeventFields[0].Descriptor()
+	// auditevent.DefaultAt holds the default value on creation for the at field.
+	auditevent.DefaultAt = auditeventDescAt.Default.(func() time.Time)
+	// auditeventDescAction is the schema descriptor for action field.
+	auditeventDescAction := auditeventFields[5].Descriptor()
+	// auditevent.ActionValidator is a validator for the "action" field. It is called by the builders before save.
+	auditevent.ActionValidator = auditeventDescAction.Validators[0].(func(string) error)
 	cspscanFields := schema.CSPScan{}.Fields()
 	_ = cspscanFields
 	// cspscanDescCheckCount is the schema descriptor for check_count field.
@@ -57,6 +110,10 @@ func init() {
 	ipDescAddress := ipFields[0].Descriptor()
 	// ip.AddressValidator is a validator for the "address" field. It is called by the builders before save.
 	ip.AddressValidator = ipDescAddress.Validators[0].(func(string) error)
+	// ipDescRescanPending is the schema descriptor for rescan_pending field.
+	ipDescRescanPending := ipFields[1].Descriptor()
+	// ip.DefaultRescanPending holds the default value on creation for the rescan_pending field.
+	ip.DefaultRescanPending = ipDescRescanPending.Default.(bool)
 	importerconfigMixin := schema.ImporterConfig{}.Mixin()
 	importerconfigMixinFields0 := importerconfigMixin[0].Fields()
 	_ = importerconfigMixinFields0
@@ -257,12 +314,20 @@ func init() {
 	targetDescResolveAttempts := targetFields[2].Descriptor()
 	// target.DefaultResolveAttempts holds the default value on creation for the resolve_attempts field.
 	target.DefaultResolveAttempts = targetDescResolveAttempts.Default.(int)
+	// targetDescSslRescanPending is the schema descriptor for ssl_rescan_pending field.
+	targetDescSslRescanPending := targetFields[5].Descriptor()
+	// target.DefaultSslRescanPending holds the default value on creation for the ssl_rescan_pending field.
+	target.DefaultSslRescanPending = targetDescSslRescanPending.Default.(bool)
+	// targetDescCspRescanPending is the schema descriptor for csp_rescan_pending field.
+	targetDescCspRescanPending := targetFields[6].Descriptor()
+	// target.DefaultCspRescanPending holds the default value on creation for the csp_rescan_pending field.
+	target.DefaultCspRescanPending = targetDescCspRescanPending.Default.(bool)
 	// targetDescLatestSslGradeRank is the schema descriptor for latest_ssl_grade_rank field.
-	targetDescLatestSslGradeRank := targetFields[6].Descriptor()
+	targetDescLatestSslGradeRank := targetFields[9].Descriptor()
 	// target.DefaultLatestSslGradeRank holds the default value on creation for the latest_ssl_grade_rank field.
 	target.DefaultLatestSslGradeRank = targetDescLatestSslGradeRank.Default.(int)
 	// targetDescOpenPortCount is the schema descriptor for open_port_count field.
-	targetDescOpenPortCount := targetFields[9].Descriptor()
+	targetDescOpenPortCount := targetFields[12].Descriptor()
 	// target.DefaultOpenPortCount holds the default value on creation for the open_port_count field.
 	target.DefaultOpenPortCount = targetDescOpenPortCount.Default.(int)
 	userMixin := schema.User{}.Mixin()

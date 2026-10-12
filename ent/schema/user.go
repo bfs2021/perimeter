@@ -34,6 +34,7 @@ func (User) Edges() []ent.Edge {
 		edge.To("invites", Invite.Type),
 		edge.To("recovery_codes", RecoveryCode.Type),
 		edge.To("login_challenges", LoginChallenge.Type),
+		edge.To("api_tokens", APIToken.Type),
 	}
 }
 

@@ -7,6 +7,8 @@ import (
 	"fmt"
 
 	"perimeter/ent"
+	"perimeter/ent/apitoken"
+	"perimeter/ent/auditevent"
 	"perimeter/ent/cspscan"
 	"perimeter/ent/datamigration"
 	"perimeter/ent/importerconfig"
@@ -82,6 +84,60 @@ func (f TraverseFunc) Traverse(ctx context.Context, q ent.Query) error {
 		return err
 	}
 	return f(ctx, query)
+}
+
+// The APITokenFunc type is an adapter to allow the use of ordinary function as a Querier.
+type APITokenFunc func(context.Context, *ent.APITokenQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f APITokenFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.APITokenQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.APITokenQuery", q)
+}
+
+// The TraverseAPIToken type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseAPIToken func(context.Context, *ent.APITokenQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseAPIToken) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseAPIToken) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.APITokenQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.APITokenQuery", q)
+}
+
+// The AuditEventFunc type is an adapter to allow the use of ordinary function as a Querier.
+type AuditEventFunc func(context.Context, *ent.AuditEventQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f AuditEventFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.AuditEventQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.AuditEventQuery", q)
+}
+
+// The TraverseAuditEvent type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseAuditEvent func(context.Context, *ent.AuditEventQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseAuditEvent) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseAuditEvent) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.AuditEventQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.AuditEventQuery", q)
 }
 
 // The CSPScanFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -519,6 +575,10 @@ func (f TraverseUser) Traverse(ctx context.Context, q ent.Query) error {
 // NewQuery returns the generic Query interface for the given typed query.
 func NewQuery(q ent.Query) (Query, error) {
 	switch q := q.(type) {
+	case *ent.APITokenQuery:
+		return &query[*ent.APITokenQuery, predicate.APIToken, apitoken.OrderOption]{typ: ent.TypeAPIToken, tq: q}, nil
+	case *ent.AuditEventQuery:
+		return &query[*ent.AuditEventQuery, predicate.AuditEvent, auditevent.OrderOption]{typ: ent.TypeAuditEvent, tq: q}, nil
 	case *ent.CSPScanQuery:
 		return &query[*ent.CSPScanQuery, predicate.CSPScan, cspscan.OrderOption]{typ: ent.TypeCSPScan, tq: q}, nil
 	case *ent.DataMigrationQuery:

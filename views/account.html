@@ -47,3 +47,85 @@
   <button type="submit" class="btn-danger">Disable two-factor</button>
 </form>
 {{end}}
+
+<h2>API tokens</h2>
+
+<p class="text-muted" style="margin-bottom: 12px;">Tokens let scripts and MCP clients act as you. Send one as <span class="mono">Authorization: Bearer &lt;token&gt;</span>. A token has your role, so a read token can't change data.</p>
+
+{{if .APITokens}}
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Scope</th>
+      <th>Prefix</th>
+      <th>Created</th>
+      <th>Last used</th>
+      <th>Expires</th>
+      <th>Status</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .APITokens}}
+    {{$status := tokenStatus .}}
+    <tr>
+      <td>{{.Name}}</td>
+      <td>{{.Scope}}</td>
+      <td class="mono">{{.Prefix}}</td>
+      <td class="text-muted">{{.CreateTime.Format "2006-01-02 15:04"}}</td>
+      <td class="text-muted">{{if .LastUsedAt}}{{.LastUsedAt.Format "2006-01-02 15:04"}}{{else}}never{{end}}</td>
+      <td class="text-muted">{{if .ExpiresAt}}{{.ExpiresAt.Format "2006-01-02"}}{{else}}never{{end}}</td>
+      <td>
+        {{if eq $status "active"}}<span class="badge badge-green">active</span>
+        {{else if eq $status "expired"}}<span class="badge badge-amber">expired</span>
+        {{else}}<span class="badge badge-red">revoked</span>{{end}}
+      </td>
+      <td>
+        {{if eq $status "active"}}
+        <form method="POST" action="/account/tokens/{{.ID}}/revoke"
+          onsubmit="return confirm('Revoke token {{.Name}}? Anything using it will stop working.');" style="display:inline;">
+          <button type="submit" class="btn-danger">Revoke</button>
+        </form>
+        {{end}}
+      </td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+{{else}}
+<p class="text-muted" style="margin-bottom: 16px;">You have no API tokens.</p>
+{{end}}
+
+<h3>Create token</h3>
+{{$scope := formValue .Flash "scope"}}
+{{$expires := formValue .Flash "expires"}}
+<form action="/account/tokens" method="POST">
+  <div class="form-group">
+    <label for="token-name">Name</label>
+    <input type="text" name="name" id="token-name" required maxlength="100" style="width: 240px;" value="{{formValue .Flash "name"}}">
+  </div>
+  <div class="form-group">
+    <label for="token-scope">Scope</label>
+    <select name="scope" id="token-scope">
+      <option value="read" {{if ne $scope "write"}}selected{{end}}>Read only</option>
+      {{if .CanWrite}}<option value="write" {{if eq $scope "write"}}selected{{end}}>Read and write</option>{{end}}
+    </select>
+  </div>
+  <div class="form-group">
+    <label for="token-expires">Expires</label>
+    <select name="expires" id="token-expires">
+      <option value="30d" {{if eq $expires "30d"}}selected{{end}}>30 days</option>
+      <option value="90d" {{if or (eq $expires "90d") (eq $expires "")}}selected{{end}}>90 days</option>
+      <option value="1y" {{if eq $expires "1y"}}selected{{end}}>1 year</option>
+      <option value="never" {{if eq $expires "never"}}selected{{end}}>Never</option>
+    </select>
+  </div>
+  {{if .User.TotpEnabled}}
+  <div class="form-group">
+    <label for="token-code">Authenticator or recovery code</label>
+    <input type="text" name="code" id="token-code" required autocomplete="one-time-code" style="width: 240px;">
+  </div>
+  {{end}}
+  <button type="submit" class="btn-primary">Create token</button>
+</form>

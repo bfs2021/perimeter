@@ -14,6 +14,25 @@ Perimeter watches the security posture of your web targets. Give it a list of ho
 - Webhook notifications
 - Web UI with email/password or OIDC login
 - SQLite or PostgreSQL storage
+- REST API and MCP server for agents, with scoped tokens
+
+## API and MCP (for agents)
+
+Perimeter has a REST API under `/api/v1` and an MCP server at `/mcp`. Both read targets, scan results, tags, the summary and the change feed. With a write token they also add and delete targets, change tags, and start scans. Every write is recorded in the audit log.
+
+Create a token on the Account page. Choose a read or write scope and an expiry. The token is shown once. It has the form `prm_...`.
+
+```bash
+curl -H "Authorization: Bearer prm_..." https://perimeter.example.com/api/v1/summary
+```
+
+To connect Claude Code:
+
+```bash
+claude mcp add --transport http perimeter https://perimeter.example.com/mcp --header "Authorization: Bearer prm_..."
+```
+
+The token page also shows snippets for Claude Desktop and curl with the token filled in. See [docs/api.md](docs/api.md) for the endpoints, errors, pagination, rate limits and idempotency, and [docs/mcp.md](docs/mcp.md) for the tools and client setup.
 
 ## Quick start
 
@@ -44,6 +63,7 @@ Set values in `.env` or pass CLI flags (flags win). Common ones:
 | `SSL_INTERVAL` | `--sslInterval` | `12h` | Time between SSL scans |
 | `CSP_INTERVAL` | `--cspInterval` | `1h` | Time between CSP scans |
 | `CERT_EXPIRY_WINDOW` | `--certExpiryWindow` | `720h` | How close to expiry a certificate is flagged on the dashboard |
+| `RESCAN_COOLDOWN` | — | `10m` | Minimum time between on-demand rescans of one target |
 
 SSL Labs needs registration details (`FIRST_NAME`, `LAST_NAME`, `EMAIL`, `ORGANIZATION`). OIDC login is optional (`OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_REDIRECT_URL`).
 

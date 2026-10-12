@@ -27,6 +27,7 @@ import (
 	"perimeter/internal/auth"
 	"perimeter/internal/importer"
 	"perimeter/internal/notifier"
+	"perimeter/internal/service"
 	"perimeter/internal/storage"
 
 	"github.com/gofiber/fiber/v2"
@@ -52,7 +53,21 @@ type Server struct {
 	certExpiryWindow time.Duration
 	// dashboardPageSize is how many targets the dashboard shows per page.
 	dashboardPageSize int
+	// apiLimiter throttles /api/v1 per token. SetAPIRateLimit replaces it.
+	apiLimiter fiber.Handler
+	// rescanCooldown is how long a target waits between rescan requests.
+	rescanCooldown time.Duration
+	// sslScanning is whether SSL Labs scanning runs; a rescan only flags SSL
+	// when a producer will pick it up.
+	sslScanning bool
+	// svc is the transport-independent layer that the API, MCP and the
+	// audited UI writes share.
+	svc *service.Service
 }
+
+// defaultRescanCooldown is the default wait between rescan requests of one
+// target (RESCAN_COOLDOWN).
+const defaultRescanCooldown = 10 * time.Minute
 
 func New(s storage.Storage, a *auth.Auth, client *ent.Client, registry *importer.Registry, notifierReg *notifier.Registry, viewsFS fs.FS, certExpiryWindow time.Duration, dashboardPageSize int) *Server {
 	engine := newViewEngine(viewsFS)
@@ -69,7 +84,11 @@ func New(s storage.Storage, a *auth.Auth, client *ent.Client, registry *importer
 		notifierRegistry:  notifierReg,
 		certExpiryWindow:  certExpiryWindow,
 		dashboardPageSize: dashboardPageSize,
+		rescanCooldown:    defaultRescanCooldown,
+		svc:               service.New(s, client, certExpiryWindow),
 	}
+	srv.svc.SetRescanConfig(defaultRescanCooldown, false)
+	srv.SetAPIRateLimit(defaultAPIRateLimit)
 
 	app := fiber.New(fiber.Config{
 		Views:        engine,
@@ -85,6 +104,19 @@ func New(s storage.Storage, a *auth.Auth, client *ent.Client, registry *importer
 // main, after the server, so it is set here instead of in New.
 func (s *Server) SetImporterSyncer(sy importerSyncer) {
 	s.syncer = sy
+}
+
+// SetRescanCooldown sets how long a target waits between rescan requests.
+func (s *Server) SetRescanCooldown(d time.Duration) {
+	s.rescanCooldown = d
+	s.svc.SetRescanConfig(s.rescanCooldown, s.sslScanning)
+}
+
+// SetSSLScanning tells the server whether SSL Labs scanning runs, so that a
+// rescan flags SSL only when the SSL producer will act on it.
+func (s *Server) SetSSLScanning(enabled bool) {
+	s.sslScanning = enabled
+	s.svc.SetRescanConfig(s.rescanCooldown, s.sslScanning)
 }
 
 // newViewEngine loads the templates from viewsFS and registers the template
@@ -113,6 +145,7 @@ func newViewEngine(viewsFS fs.FS) *html.Engine {
 	engine.AddFunc("eventLabel", notifierEventLabel)
 	engine.AddFunc("formValue", formValue)
 	engine.AddFunc("formChecked", formChecked)
+	engine.AddFunc("tokenStatus", tokenStatus)
 	return engine
 }
 
@@ -127,6 +160,10 @@ func (s *Server) setupRoutes() {
 	// Before every route, public ones included: login and setup forms are
 	// CSRF targets too.
 	s.app.Use(crossOriginProtection())
+
+	// Bearer-token API. Mounted before the cookie group below, which would
+	// otherwise catch these paths first.
+	s.setupAPIRoutes()
 
 	// Public routes
 	s.app.Get("/setup", s.handleSetupPage)
@@ -159,7 +196,9 @@ func (s *Server) setupRoutes() {
 	// Registered before /targets/:id/... so "bulk" is not read as an id.
 	authed.Post("/targets/bulk/export", s.handleBulkExport)
 	authed.Post("/targets/bulk/delete", canWrite, s.handleBulkDelete)
+	authed.Post("/targets/bulk/rescan", canWrite, s.handleBulkRescan)
 	authed.Post("/targets/:id/delete", canWrite, s.handleDeleteTarget)
+	authed.Post("/targets/:id/rescan", canWrite, s.handleRescanTarget)
 	authed.Post("/targets/:id/restore", canWrite, s.handleRestoreTarget)
 	authed.Post("/targets/:id/purge", adminOnly, s.handlePurgeTarget)
 	authed.Post("/targets/:id/tags", canWrite, s.handleUpdateTargetTags)
@@ -172,9 +211,12 @@ func (s *Server) setupRoutes() {
 	authed.Post("/account/2fa/confirm", s.handleAccountConfirm)
 	authed.Post("/account/2fa/recovery", s.handleAccountRecovery)
 	authed.Post("/account/2fa/disable", s.handleAccountDisable)
+	authed.Post("/account/tokens", s.handleCreateAPIToken)
+	authed.Post("/account/tokens/:id/revoke", s.handleRevokeAPIToken)
 
 	// Admin routes
 	authed.Get("/settings", adminOnly, s.handleSettings)
+	authed.Get("/settings/audit", adminOnly, s.handleAuditPage)
 	authed.Post("/invite", adminOnly, s.handleInvite)
 	authed.Get("/users", adminOnly, s.handleUsers)
 	authed.Post("/users/:id/delete", adminOnly, s.handleDeleteUser)
@@ -189,6 +231,7 @@ func (s *Server) setupRoutes() {
 	authed.Post("/notifiers/:id/toggle", adminOnly, s.handleToggleNotifier)
 	authed.Post("/tags", adminOnly, s.handleCreateTag)
 	authed.Post("/tags/:id/delete", adminOnly, s.handleDeleteTag)
+	authed.Post("/settings/tokens/:id/revoke", adminOnly, s.handleAdminRevokeAPIToken)
 
 	// Catch-all: a path no route claimed renders the 404 page instead of
 	// fiber's plain text. Registered last, so only unmatched paths reach it.
@@ -229,6 +272,10 @@ func (s *Server) errorHandler(c *fiber.Ctx, err error) error {
 		// Internal errors are logged, not shown: they can carry SQL or paths.
 		log.Printf("%s %s: %v", c.Method(), c.Path(), err)
 		msg = "An unexpected error occurred. Check the server log for details."
+	}
+	// The /api/ and /mcp routes answer in JSON, whatever went wrong.
+	if strings.HasPrefix(c.Path(), "/api/") || c.Path() == "/mcp" {
+		return apiError(c, code, apiErrorCode(code), msg)
 	}
 	title := "Something went wrong"
 	switch code {
@@ -952,14 +999,15 @@ func (s *Server) handleTargetDetails(c *fiber.Ctx) error {
 	allTags, _ := s.client.Tag.Query().All(c.Context())
 
 	return c.Render("views/target", s.templateData(c, fiber.Map{
-		"Title":         "Target Details",
-		"Target":        target,
-		"AllTags":       allTags,
-		"IPRows":        ipRows,
-		"SSLScans":      sslScans,
-		"SSLPagination": sslPagination,
-		"CSPScans":      cspScans,
-		"CSPPagination": cspPagination,
+		"Title":           "Target Details",
+		"Target":          target,
+		"AllTags":         allTags,
+		"IPRows":          ipRows,
+		"RescanRequested": rescanRequested(target),
+		"SSLScans":        sslScans,
+		"SSLPagination":   sslPagination,
+		"CSPScans":        cspScans,
+		"CSPPagination":   cspPagination,
 	}), "views/layouts/main")
 }
 
@@ -978,6 +1026,7 @@ func (s *Server) handleDeleteTarget(c *fiber.Ctx) error {
 		}
 		return err
 	}
+	s.auditUI(c, "target.delete", label, "")
 
 	setFlash(c, flash{Kind: "success", Message: fmt.Sprintf("Deleted %s. You can restore it from Deleted targets.", label)})
 	return c.Redirect("/", fiber.StatusSeeOther)
@@ -991,6 +1040,62 @@ func (s *Server) targetLabel(ctx context.Context, id int) string {
 		return "target " + strconv.Itoa(id)
 	}
 	return t.Input
+}
+
+// auditUI records a write made from the web UI, after it succeeded, so a
+// failed write leaves no row.
+func (s *Server) auditUI(c *fiber.Ctx, action, object, detail string) {
+	s.svc.Audit(c.Context(), service.Actor{User: auth.GetUser(c), Source: service.SourceUI}, action, object, detail)
+}
+
+// rescanKinds is what a rescan from this server queues: SSL only when SSL Labs
+// scanning runs.
+func (s *Server) rescanKinds() storage.RescanKinds {
+	return storage.RescanKinds{SSL: s.sslScanning, CSP: true, Ports: true}
+}
+
+// rescanRequested returns when the pending rescan of t was requested, or nil
+// when none is pending: no flag is set, or a stored result has cleared them.
+func rescanRequested(t *ent.Target) *time.Time {
+	if t.RescanRequestedAt == nil {
+		return nil
+	}
+	if t.SslRescanPending || t.CspRescanPending {
+		return t.RescanRequestedAt
+	}
+	for _, i := range t.Edges.Ips {
+		if i.RescanPending {
+			return t.RescanRequestedAt
+		}
+	}
+	return nil
+}
+
+// handleRescanTarget queues an on-demand scan of one target. It flashes either
+// that the rescan is queued, or when the target may be rescanned again.
+func (s *Server) handleRescanTarget(c *fiber.Ctx) error {
+	id, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid ID")
+	}
+
+	label := s.targetLabel(c.Context(), id)
+	res, err := s.storage.RequestRescan(c.Context(), []int{id}, time.Now(), s.rescanCooldown, s.rescanKinds())
+	if err != nil {
+		return err
+	}
+	if len(res.NotFound) > 0 {
+		return fiber.NewError(fiber.StatusNotFound, "Target not found")
+	}
+	if len(res.CoolingDown) > 0 {
+		s.auditUI(c, "target.rescan", label, "cooling down")
+		retry := res.CoolingDown[0].RetryAt.Format("15:04")
+		setFlash(c, flash{Kind: "error", Message: fmt.Sprintf("%s was rescanned recently; try again after %s.", label, retry)})
+	} else {
+		s.auditUI(c, "target.rescan", label, "queued")
+		setFlash(c, flash{Kind: "success", Message: "Rescan queued for " + label + "."})
+	}
+	return c.Redirect("/targets/"+strconv.Itoa(id), fiber.StatusSeeOther)
 }
 
 func (s *Server) handleDeletedTargets(c *fiber.Ctx) error {
@@ -1019,6 +1124,7 @@ func (s *Server) handleRestoreTarget(c *fiber.Ctx) error {
 		}
 		return err
 	}
+	s.auditUI(c, "target.restore", label, "")
 
 	setFlash(c, flash{Kind: "success", Message: "Restored " + label + "."})
 	return c.Redirect("/targets/deleted", fiber.StatusSeeOther)
@@ -1038,6 +1144,7 @@ func (s *Server) handlePurgeTarget(c *fiber.Ctx) error {
 		}
 		return err
 	}
+	s.auditUI(c, "target.purge", label, "")
 
 	setFlash(c, flash{Kind: "success", Message: "Purged " + label + "."})
 	return c.Redirect("/targets/deleted", fiber.StatusSeeOther)
@@ -1071,6 +1178,8 @@ func (s *Server) handleImportSubmit(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
+	object, detail := service.ImportAudit(res)
+	s.auditUI(c, "target.import", object, detail)
 
 	// Re-render the form with the result so the user sees what happened; the
 	// invalid lines are prefilled in the textarea for a fixed resubmit.
@@ -1085,18 +1194,22 @@ func (s *Server) handleImportSubmit(c *fiber.Ctx) error {
 
 func (s *Server) settingsData(c *fiber.Ctx, extra fiber.Map) fiber.Map {
 	users, _ := s.client.User.Query().All(c.Context())
+	apiTokens, _ := s.auth.ListAllAPITokens(c.Context())
 	importers, _ := s.client.ImporterConfig.Query().All(c.Context())
 	notifiers, _ := s.client.NotifierConfig.Query().All(c.Context())
 	tags, _ := s.client.Tag.Query().All(c.Context())
+	audit, _ := s.svc.ListAudit(c.Context(), auditSettingsSize, 0)
 	providers := s.registry.List()
 	notifierProviders := s.notifierRegistry.List()
 
 	data := s.templateData(c, fiber.Map{
 		"Title":              "Settings",
 		"Users":              users,
+		"APITokens":          apiTokens,
 		"Importers":          importers,
 		"Notifiers":          notifiers,
 		"Tags":               tags,
+		"AuditEvents":        audit.Items,
 		"Providers":          providers,
 		"NotifierProviders":  notifierProviders,
 		"NotifierEventTypes": notifier.AllEventTypes(),
@@ -1109,6 +1222,87 @@ func (s *Server) settingsData(c *fiber.Ctx, extra fiber.Map) fiber.Map {
 
 func (s *Server) handleSettings(c *fiber.Ctx) error {
 	return c.Render("views/settings", s.settingsData(c, nil), "views/layouts/main")
+}
+
+// auditSettingsSize is how many recent events the settings page lists.
+const auditSettingsSize = 50
+
+// auditPageSize is how many events each page of /settings/audit lists.
+const auditPageSize = 50
+
+// handleAuditPage shows the audit log, newest first, one page at a time. A
+// page past the end shows the last one.
+func (s *Server) handleAuditPage(c *fiber.Ctx) error {
+	page := parsePage(c, "page")
+	list, err := s.svc.ListAudit(c.Context(), auditPageSize, (page-1)*auditPageSize)
+	if err != nil {
+		return err
+	}
+	if last := clampPage(page, list.Total, auditPageSize); last != page {
+		page = last
+		if list, err = s.svc.ListAudit(c.Context(), auditPageSize, (page-1)*auditPageSize); err != nil {
+			return err
+		}
+	}
+
+	return c.Render("views/audit", s.templateData(c, fiber.Map{
+		"Title":      "Audit log",
+		"Events":     list.Items,
+		"Pagination": auditPagination(c, page, list.Total),
+	}), "views/layouts/main")
+}
+
+// auditPagination is the pager for the audit log. It is built here because
+// buildPagination counts in scan pages.
+func auditPagination(c *fiber.Ctx, page, total int) pagination {
+	totalPages := max(1, (total+auditPageSize-1)/auditPageSize)
+	p := pagination{Page: page, TotalPages: totalPages}
+	if page > 1 {
+		p.PrevURL = buildPageLink(c, "page", page-1)
+	}
+	if page < totalPages {
+		p.NextURL = buildPageLink(c, "page", page+1)
+	}
+	return p
+}
+
+// userLabel is a user's email for an audit row. A user that no longer exists
+// is named by its id.
+func (s *Server) userLabel(ctx context.Context, id int) string {
+	u, err := s.client.User.Get(ctx, id)
+	if err != nil {
+		return "user " + strconv.Itoa(id)
+	}
+	return u.Email
+}
+
+// importerLabel is the provider of an importer for an audit row. A missing
+// importer is named by its id.
+func (s *Server) importerLabel(ctx context.Context, id int) string {
+	cfg, err := s.client.ImporterConfig.Get(ctx, id)
+	if err != nil {
+		return "importer " + strconv.Itoa(id)
+	}
+	return string(cfg.Provider)
+}
+
+// notifierLabel is the provider of a notifier for an audit row. A missing
+// notifier is named by its id.
+func (s *Server) notifierLabel(ctx context.Context, id int) string {
+	cfg, err := s.client.NotifierConfig.Get(ctx, id)
+	if err != nil {
+		return "notifier " + strconv.Itoa(id)
+	}
+	return string(cfg.Provider)
+}
+
+// tagLabel is a tag's name for an audit row. A missing tag is named by its id.
+func (s *Server) tagLabel(ctx context.Context, id int) string {
+	t, err := s.client.Tag.Get(ctx, id)
+	if err != nil {
+		return "tag " + strconv.Itoa(id)
+	}
+	return t.Name
 }
 
 // userError turns an error from a settings action into a message that is
@@ -1159,6 +1353,7 @@ func (s *Server) handleInvite(c *fiber.Ctx) error {
 		return c.Redirect("/settings", fiber.StatusSeeOther)
 	}
 
+	s.auditUI(c, "user.invite", email, inviteRole.String())
 	inviteLink := fmt.Sprintf("%s/register/%s", c.BaseURL(), token)
 	setFlash(c, flash{
 		Kind:       "success",
@@ -1185,6 +1380,7 @@ func (s *Server) handleDeleteUser(c *fiber.Ctx) error {
 		return c.Redirect("/settings", fiber.StatusSeeOther)
 	}
 
+	label := s.userLabel(c.Context(), id)
 	if err := s.auth.DeleteUser(c.Context(), id); err != nil {
 		if ent.IsNotFound(err) {
 			return fiber.NewError(fiber.StatusNotFound, "User not found")
@@ -1194,6 +1390,7 @@ func (s *Server) handleDeleteUser(c *fiber.Ctx) error {
 		return c.Redirect("/settings", fiber.StatusSeeOther)
 	}
 
+	s.auditUI(c, "user.delete", label, "")
 	setFlash(c, flash{Kind: "success", Message: "User deleted."})
 	return c.Redirect("/settings", fiber.StatusSeeOther)
 }
@@ -1250,6 +1447,7 @@ func (s *Server) handleChangeRole(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusForbidden, "An admin's role cannot be changed")
 	}
 
+	s.auditUI(c, "user.role", target.Email, "role "+role.String())
 	article := "a "
 	if role == user.RoleAdmin {
 		article = "an "
@@ -1293,6 +1491,7 @@ func (s *Server) handleCreateImporter(c *fiber.Ctx) error {
 		return c.Redirect("/settings", fiber.StatusSeeOther)
 	}
 
+	s.auditUI(c, "importer.create", provider, "")
 	setFlash(c, flash{Kind: "success", Message: "Importer added. The first sync is running."})
 	return c.Redirect("/settings", fiber.StatusSeeOther)
 }
@@ -1319,11 +1518,13 @@ func (s *Server) handleDeleteImporter(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "Invalid ID")
 	}
 
+	label := s.importerLabel(c.Context(), id)
 	if err := s.client.ImporterConfig.DeleteOneID(id).Exec(c.Context()); err != nil {
 		setFlash(c, flash{Kind: "error", Message: userError("delete importer", err)})
 		return c.Redirect("/settings", fiber.StatusSeeOther)
 	}
 
+	s.auditUI(c, "importer.delete", label, "")
 	setFlash(c, flash{Kind: "success", Message: "Importer deleted."})
 	return c.Redirect("/settings", fiber.StatusSeeOther)
 }
@@ -1342,11 +1543,12 @@ func (s *Server) handleToggleImporter(c *fiber.Ctx) error {
 	if err := s.client.ImporterConfig.UpdateOne(cfg).SetEnabled(!cfg.Enabled).Exec(c.Context()); err != nil {
 		return err
 	}
-	msg := "Importer disabled."
+	state := "disabled"
 	if !cfg.Enabled {
-		msg = "Importer enabled."
+		state = "enabled"
 	}
-	setFlash(c, flash{Kind: "success", Message: msg})
+	s.auditUI(c, "importer.toggle", string(cfg.Provider), state)
+	setFlash(c, flash{Kind: "success", Message: "Importer " + state + "."})
 	return c.Redirect("/settings", fiber.StatusSeeOther)
 }
 
@@ -1483,6 +1685,7 @@ func (s *Server) handleCreateNotifier(c *fiber.Ctx) error {
 		return c.Redirect("/settings", fiber.StatusSeeOther)
 	}
 
+	s.auditUI(c, "notifier.create", provider, "")
 	setFlash(c, flash{Kind: "success", Message: "Notifier added."})
 	return c.Redirect("/settings", fiber.StatusSeeOther)
 }
@@ -1518,11 +1721,13 @@ func (s *Server) handleDeleteNotifier(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "Invalid ID")
 	}
 
+	label := s.notifierLabel(c.Context(), id)
 	if err := s.client.NotifierConfig.DeleteOneID(id).Exec(c.Context()); err != nil {
 		setFlash(c, flash{Kind: "error", Message: userError("delete notifier", err)})
 		return c.Redirect("/settings", fiber.StatusSeeOther)
 	}
 
+	s.auditUI(c, "notifier.delete", label, "")
 	setFlash(c, flash{Kind: "success", Message: "Notifier deleted."})
 	return c.Redirect("/settings", fiber.StatusSeeOther)
 }
@@ -1541,11 +1746,12 @@ func (s *Server) handleToggleNotifier(c *fiber.Ctx) error {
 	if err := s.client.NotifierConfig.UpdateOne(cfg).SetEnabled(!cfg.Enabled).Exec(c.Context()); err != nil {
 		return err
 	}
-	msg := "Notifier disabled."
+	state := "disabled"
 	if !cfg.Enabled {
-		msg = "Notifier enabled."
+		state = "enabled"
 	}
-	setFlash(c, flash{Kind: "success", Message: msg})
+	s.auditUI(c, "notifier.toggle", string(cfg.Provider), state)
+	setFlash(c, flash{Kind: "success", Message: "Notifier " + state + "."})
 	return c.Redirect("/settings", fiber.StatusSeeOther)
 }
 
@@ -1567,6 +1773,7 @@ func (s *Server) handleCreateTag(c *fiber.Ctx) error {
 		return c.Redirect("/settings", fiber.StatusSeeOther)
 	}
 
+	s.auditUI(c, "tag.create", name, "")
 	setFlash(c, flash{Kind: "success", Message: fmt.Sprintf(`Tag "%s" created.`, name)})
 	return c.Redirect("/settings", fiber.StatusSeeOther)
 }
@@ -1577,11 +1784,13 @@ func (s *Server) handleDeleteTag(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "Invalid ID")
 	}
 
+	label := s.tagLabel(c.Context(), id)
 	if err := s.client.Tag.DeleteOneID(id).Exec(c.Context()); err != nil {
 		setFlash(c, flash{Kind: "error", Message: userError("delete tag", err)})
 		return c.Redirect("/settings", fiber.StatusSeeOther)
 	}
 
+	s.auditUI(c, "tag.delete", label, "")
 	setFlash(c, flash{Kind: "success", Message: "Tag deleted."})
 	return c.Redirect("/settings", fiber.StatusSeeOther)
 }
@@ -1602,6 +1811,7 @@ func (s *Server) handleUpdateTargetTags(c *fiber.Ctx) error {
 	tagIDs := c.Context().PostArgs().PeekMulti("tags")
 	seen := make(map[int]bool)
 	var ids []int
+	var names []string
 	for _, raw := range tagIDs {
 		tid, err := strconv.Atoi(string(raw))
 		if err != nil {
@@ -1620,6 +1830,9 @@ func (s *Server) handleUpdateTargetTags(c *fiber.Ctx) error {
 		if len(found) != len(ids) {
 			return fiber.NewError(fiber.StatusBadRequest, "Unknown tag")
 		}
+		for _, g := range found {
+			names = append(names, g.Name)
+		}
 	}
 
 	// Clear existing tags and set the new ones in one update; no values
@@ -1628,6 +1841,12 @@ func (s *Server) handleUpdateTargetTags(c *fiber.Ctx) error {
 		return err
 	}
 
+	slices.Sort(names)
+	detail := "tags cleared"
+	if len(names) > 0 {
+		detail = "tags set to " + strings.Join(names, ", ")
+	}
+	s.auditUI(c, "target.tags", t.Input, detail)
 	setFlash(c, flash{Kind: "success", Message: "Tags updated."})
 	return c.Redirect(fmt.Sprintf("/targets/%d", id), fiber.StatusSeeOther)
 }
@@ -1975,11 +2194,29 @@ func (s *Server) handleBulkDelete(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
+	s.auditUI(c, "target.delete", fmt.Sprintf("%d targets", n), "")
 	noun := "targets"
 	if n == 1 {
 		noun = "target"
 	}
 	setFlash(c, flash{Kind: "success", Message: fmt.Sprintf("Deleted %d %s.", n, noun)})
+	return c.Redirect("/", fiber.StatusSeeOther)
+}
+
+// handleBulkRescan queues a rescan of the resolved selection. Unlike delete it
+// needs no confirmation: a rescan changes no targets, only the scan queue.
+func (s *Server) handleBulkRescan(c *fiber.Ctx) error {
+	ids, err := s.bulkSelection(c)
+	if err != nil {
+		return bulkError(err)
+	}
+
+	res, err := s.storage.RequestRescan(c.Context(), ids, time.Now(), s.rescanCooldown, s.rescanKinds())
+	if err != nil {
+		return err
+	}
+	s.auditUI(c, "target.rescan", fmt.Sprintf("%d targets", len(ids)), fmt.Sprintf("%d queued, %d cooling down", len(res.Queued), len(res.CoolingDown)))
+	setFlash(c, flash{Kind: "success", Message: fmt.Sprintf("Rescan queued for %d targets (%d cooling down).", len(res.Queued), len(res.CoolingDown))})
 	return c.Redirect("/", fiber.StatusSeeOther)
 }
 
