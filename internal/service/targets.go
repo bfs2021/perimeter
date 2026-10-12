@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"perimeter/ent"
+	"perimeter/ent/schema"
 	"perimeter/ent/tag"
 	"perimeter/ent/target"
 	"perimeter/internal/storage"
@@ -49,7 +50,9 @@ type TargetQuery struct {
 	// ExpiringWithinDays keeps targets whose certificate expires within this
 	// many days, expired ones included. 0 means no constraint.
 	ExpiringWithinDays int
-	Deleted            bool
+	// Expired keeps targets whose certificate has already expired.
+	Expired bool
+	Deleted bool
 	// Sort is one of storage.SortFields; empty sorts by input.
 	Sort string
 	Desc bool
@@ -145,6 +148,7 @@ func (q TargetQuery) filter() (storage.TargetFilter, error) {
 		SSLGrade: q.SSLGrade,
 		SSLBelow: q.SSLBelow,
 		Port:     q.Port,
+		Expired:  q.Expired,
 	}
 	for _, name := range q.States {
 		st, ok := reachabilityByName[name]
@@ -225,7 +229,7 @@ func (s *Service) ListTargets(ctx context.Context, q TargetQuery) (Page[TargetSu
 // than silently ignored.
 func (s *Service) listDeleted(ctx context.Context, q TargetQuery, limit int) (Page[TargetSummary], error) {
 	if q.Tag != "" || len(q.States) > 0 || q.CSP != "" || q.SSLGrade != "" ||
-		q.SSLBelow != "" || q.Port != 0 || q.ExpiringWithinDays != 0 || q.Sort != "" {
+		q.SSLBelow != "" || q.Port != 0 || q.ExpiringWithinDays != 0 || q.Expired || q.Sort != "" {
 		return Page[TargetSummary]{}, invalid("deleted", "only search can be combined with deleted")
 	}
 	rows, err := s.st.ListDeletedTargets(ctx)
@@ -247,6 +251,24 @@ func (s *Service) listDeleted(ctx context.Context, q TargetQuery, limit int) (Pa
 	}
 	end := min(q.Offset+limit, total)
 	return newPage(matched[q.Offset:end], total, q.Offset), nil
+}
+
+// FindTargetByInput returns the id of the target whose input is name, after
+// the same normalization an import applies. It finds soft-deleted targets too,
+// so restore_target can name one; callers check liveness themselves. An
+// unknown or unparsable name is ErrNotFound.
+func (s *Service) FindTargetByInput(ctx context.Context, name string) (int, error) {
+	normalized, _, ok := storage.NormalizeTarget(strings.TrimSpace(name))
+	if !ok {
+		return 0, ErrNotFound
+	}
+	id, err := s.client.Target.Query().
+		Where(target.Input(normalized)).
+		OnlyID(schema.SkipSoftDelete(ctx))
+	if ent.IsNotFound(err) {
+		return 0, ErrNotFound
+	}
+	return id, err
 }
 
 // GetTarget returns one live target with its newest scans. A missing or

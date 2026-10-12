@@ -5,8 +5,10 @@ import (
 	"time"
 
 	"perimeter/internal/auth"
+	"perimeter/internal/mcpserver"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
 )
 
@@ -25,6 +27,20 @@ func (s *Server) setupAPIRoutes() {
 	api.Use(func(c *fiber.Ctx) error {
 		return apiError(c, fiber.StatusNotFound, "not_found", "no such endpoint")
 	})
+
+	s.setupMCPRoute()
+}
+
+// mcpVersion is the version the MCP server reports. Nothing sets a build
+// version yet, so it is a fixed "dev".
+const mcpVersion = "dev"
+
+// setupMCPRoute mounts the MCP endpoint at /mcp. It sits outside the /api/v1
+// group but takes the same credentials: a bearer token only, through the same
+// per-token limiter.
+func (s *Server) setupMCPRoute() {
+	h := mcpserver.New(s.svc, s.auth, mcpVersion)
+	s.app.All("/mcp", auth.RequireAPIToken(s.auth), s.APIRateLimitMiddleware(), adaptor.HTTPHandler(h))
 }
 
 // SetAPIRateLimit sets how many /api/v1 requests a token may make per minute.
