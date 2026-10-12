@@ -26,7 +26,7 @@ func (t *toolset) addWriteTools(srv *mcp.Server) {
 
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "set_tags",
-		Description: "Change the tags of one target. mode replace sets its tags to exactly the list given, add adds them, and remove takes them off. Tags must already exist; admins create them in the UI. Repeating a call gives the same result. target is an id or a name.",
+		Description: "Change the tags of one target. mode replace sets its tags to exactly the list given, add adds them, and remove takes them off; mode defaults to add when left out. Tags must already exist; admins create them in the UI. Repeating a call gives the same result. target is an id or a name.",
 		Annotations: &mcp.ToolAnnotations{IdempotentHint: true, OpenWorldHint: ptr(false)},
 	}, t.setTags)
 
@@ -84,10 +84,13 @@ func (t *toolset) addTargets(ctx context.Context, _ *mcp.CallToolRequest, in add
 type setTagsIn struct {
 	Target string   `json:"target" jsonschema:"The target: a numeric id such as 12, or the name of the target such as example.com."`
 	Tags   []string `json:"tags" jsonschema:"Tag names. With mode replace an empty list removes every tag."`
-	Mode   string   `json:"mode" jsonschema:"replace sets the tags to exactly this list. add adds them to the current tags. remove takes them off the target."`
+	Mode   string   `json:"mode,omitempty" jsonschema:"How to apply the tags: replace sets them to exactly this list, add adds them to the current tags, remove takes them off. Optional, defaults to add."`
 }
 
 func (t *toolset) setTags(ctx context.Context, _ *mcp.CallToolRequest, in setTagsIn) (*mcp.CallToolResult, service.TargetSummary, error) {
+	if in.Mode == "" {
+		in.Mode = "add"
+	}
 	var write func(context.Context, service.Actor, int, []string) (*service.TargetSummary, error)
 	switch in.Mode {
 	case "replace":
@@ -128,7 +131,7 @@ func (t *toolset) deleteTarget(ctx context.Context, _ *mcp.CallToolRequest, in t
 	if err := t.svc.DeleteTarget(ctx, t.actor, id); err != nil {
 		return nil, ActionOut{}, notFound(in.Target, "live target", err)
 	}
-	return reply(fmt.Sprintf("deleted #%d; restore_target brings it back with its history", id),
+	return reply(fmt.Sprintf("deleted %s; restore_target brings it back with its history", t.namedTarget(ctx, id)),
 		ActionOut{ID: id, Status: "deleted"})
 }
 
@@ -140,7 +143,17 @@ func (t *toolset) restoreTarget(ctx context.Context, _ *mcp.CallToolRequest, in 
 	if err := t.svc.RestoreTarget(ctx, t.actor, id); err != nil {
 		return nil, ActionOut{}, notFound(in.Target, "soft-deleted target", err)
 	}
-	return reply(fmt.Sprintf("restored #%d with its history", id), ActionOut{ID: id, Status: "restored"})
+	return reply(fmt.Sprintf("restored %s with its history", t.namedTarget(ctx, id)), ActionOut{ID: id, Status: "restored"})
+}
+
+// namedTarget is "input (#id)" for a reply, or "#id" when the input cannot be
+// looked up.
+func (t *toolset) namedTarget(ctx context.Context, id int) string {
+	input, err := t.svc.TargetInput(ctx, id)
+	if err != nil {
+		return fmt.Sprintf("#%d", id)
+	}
+	return fmt.Sprintf("%s (#%d)", input, id)
 }
 
 type rescanIn struct {
@@ -173,10 +186,14 @@ func (t *toolset) rescan(ctx context.Context, _ *mcp.CallToolRequest, in rescanI
 
 	var b strings.Builder
 	if len(res.Queued) > 0 {
-		b.WriteString("queued: " + joinIDs(res.Queued) + "\n")
+		names := make([]string, 0, len(res.Queued))
+		for _, id := range res.Queued {
+			names = append(names, t.namedTarget(ctx, id))
+		}
+		b.WriteString("queued: " + strings.Join(names, ", ") + "\n")
 	}
 	for _, c := range res.CoolingDown {
-		fmt.Fprintf(&b, "cooling down: #%d, retry at %s\n", c.ID, formatTime(c.RetryAt))
+		fmt.Fprintf(&b, "cooling down: %s, retry at %s\n", t.namedTarget(ctx, c.ID), formatTime(c.RetryAt))
 	}
 	if len(res.NotFound) > 0 {
 		b.WriteString("not found: " + joinIDs(res.NotFound) + "\n")

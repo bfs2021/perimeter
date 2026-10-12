@@ -846,8 +846,8 @@ components:
           format: date-time
     CSPFinding:
       type: object
-      description: One finding of the CSP check. Type and severity are the scanner's numeric codes.
-      required: [type, description, severity, directive]
+      description: One finding of the CSP check. Type and severity are the scanner's numeric codes; level names the severity.
+      required: [type, description, severity, level, directive]
       properties:
         type:
           type: integer
@@ -855,6 +855,9 @@ components:
           type: string
         severity:
           type: integer
+        level:
+          type: string
+          enum: [high, medium, low, info]
         directive:
           type: string
         value:

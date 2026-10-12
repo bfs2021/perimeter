@@ -13,9 +13,9 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// readOnly is the annotation of every read tool: it changes nothing and
-// reaches no outside system.
-var readOnly = &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: ptr(false)}
+// readOnly is the annotation of every read tool: it changes nothing, repeats
+// have no further effect, and it reaches no outside system.
+var readOnly = &mcp.ToolAnnotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: ptr(false)}
 
 // addReadTools registers the tools every caller gets.
 func (t *toolset) addReadTools(srv *mcp.Server) {
@@ -33,7 +33,7 @@ func (t *toolset) addReadTools(srv *mcp.Server) {
 
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "get_target",
-		Description: "Full detail of one target: its IP addresses with open ports, the newest SSL scan (grade, certificate expiry and issuer, protocols) and the newest CSP evaluation. target is an id such as 12 or a name such as example.com.",
+		Description: "Full detail of one target: its reachability state and tags, its IP addresses with open ports, the newest SSL scan (grade, certificate expiry and issuer) and the newest CSP evaluation with a line per finding (level, directive, value, description), and when each scan last ran. target is an id such as 12 or a name such as example.com.",
 		Annotations: readOnly,
 	}, t.getTarget)
 
@@ -51,7 +51,7 @@ func (t *toolset) addReadTools(srv *mcp.Server) {
 
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "changes_since",
-		Description: "Changes seen after a time, oldest first: targets added or deleted, SSL grade changes, certificate renewals, ports opened or closed, CSP changes, and reachability changes. since is an RFC 3339 time such as 2026-10-11T00:00:00Z, or a duration back from now such as 24h or 7d. The reply gives until: the time the list covers up to. When truncated is true, call again with since set to until. Use this to poll for new results.",
+		Description: "Changes seen after a time, oldest first: targets added or deleted, SSL grade changes, certificate renewals, ports opened or closed, CSP changes, and reachability changes. since is an RFC 3339 time such as 2026-10-11T00:00:00Z, or a duration back from now such as 24h or 7d. The reply gives until: the time of the last change, or since when there is none. To page through or poll for new results, call again with since set to until.",
 		Annotations: readOnly,
 	}, t.changesSince)
 
@@ -126,11 +126,15 @@ func (t *toolset) getTarget(ctx context.Context, _ *mcp.CallToolRequest, in targ
 
 	var b strings.Builder
 	b.WriteString(targetLine(d.TargetSummary))
+	fmt.Fprintf(&b, "\nstate: %s", d.Reachability)
 	if d.ResolveError != "" {
 		b.WriteString("\nresolve error: " + d.ResolveError)
 	}
 	for _, ip := range d.IPs {
 		fmt.Fprintf(&b, "\nIP %s: %s", ip.Address, portsText(ip))
+		if ip.LastChecked != nil {
+			fmt.Fprintf(&b, " (checked %s)", formatTime(*ip.LastChecked))
+		}
 	}
 	if d.SSL == nil {
 		b.WriteString("\nSSL: not scanned")
@@ -145,16 +149,33 @@ func (t *toolset) getTarget(ctx context.Context, _ *mcp.CallToolRequest, in targ
 		if len(d.SSL.Vulnerabilities) > 0 {
 			b.WriteString(", vulnerabilities: " + strings.Join(d.SSL.Vulnerabilities, ", "))
 		}
+		fmt.Fprintf(&b, " (checked %s)", formatTime(d.SSL.LastChecked))
 	}
 	switch {
 	case d.CSP == nil:
 		b.WriteString("\nCSP: not checked")
 	case d.CSP.ProbeError != "":
-		b.WriteString("\nCSP: no response: " + d.CSP.ProbeError)
+		fmt.Fprintf(&b, "\nCSP: no response: %s (checked %s)", d.CSP.ProbeError, formatTime(d.CSP.LastChecked))
 	default:
-		b.WriteString("\n" + cspText(len(d.CSP.Findings)))
+		b.WriteString("\n" + cspText(len(d.CSP.Findings)) + " (checked " + formatTime(d.CSP.LastChecked) + ")")
+		for _, f := range d.CSP.Findings {
+			b.WriteString("\n" + cspFindingLine(f))
+		}
 	}
 	return reply(b.String(), *d)
+}
+
+// cspFindingLine is one CSP finding: level, directive, value, short
+// description; empty parts are left out.
+func cspFindingLine(f service.CSPFinding) string {
+	line := "- " + f.Level
+	if f.Directive != "" {
+		line += " " + f.Directive
+	}
+	if f.Value != "" {
+		line += " " + f.Value
+	}
+	return line + ": " + f.Description
 }
 
 // portsText describes one IP of a target in a detail reply.
@@ -293,7 +314,7 @@ func (t *toolset) findIssues(ctx context.Context, _ *mcp.CallToolRequest, in iss
 			fmt.Fprintf(&b, "%s: none\n", cat)
 			continue
 		}
-		fmt.Fprintf(&b, "%s: %d targets\n", cat, page.Total)
+		fmt.Fprintf(&b, "%s: %s\n", cat, countNoun(page.Total, "target"))
 		for _, it := range g.Targets {
 			fmt.Fprintf(&b, "  #%d %s: %s\n", it.ID, it.Input, it.Reason)
 		}
@@ -380,8 +401,9 @@ type changesIn struct {
 	Limit int    `json:"limit,omitempty" jsonschema:"Changes per call. Default 25, at most 100."`
 }
 
-// ChangesOut is the reply of changes_since. Until is the time the list covers
-// up to: now when the list is complete, otherwise the time of its last change.
+// ChangesOut is the reply of changes_since. Until is the time of the last
+// change, or since when there is none, so the next poll starting there misses
+// nothing that was being written while this one ran.
 type ChangesOut struct {
 	Changes   []service.Change `json:"changes"`
 	Until     time.Time        `json:"until"`
@@ -398,21 +420,23 @@ func (t *toolset) changesSince(ctx context.Context, _ *mcp.CallToolRequest, in c
 	if err != nil {
 		return nil, ChangesOut{}, err
 	}
-	out := ChangesOut{Changes: changes, Until: now, Truncated: truncated}
+	out := ChangesOut{Changes: changes, Until: since, Truncated: truncated}
 	if out.Changes == nil {
 		out.Changes = []service.Change{}
 	}
-	if truncated {
+	if len(changes) > 0 {
 		out.Until = changes[len(changes)-1].At
 	}
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "%d changes since %s", len(changes), formatTime(since))
+	fmt.Fprintf(&b, "%s since %s", countNoun(len(changes), "change"), formatTime(since))
 	for _, c := range changes {
 		fmt.Fprintf(&b, "\n%s · %s · %s", formatTime(c.At), c.Target, c.Summary)
 	}
 	if truncated {
-		fmt.Fprintf(&b, "\nmore follow; call again with since=%s", out.Until.UTC().Format(time.RFC3339))
+		fmt.Fprintf(&b, "\nmore follow; call again with since=%s", out.Until.UTC().Format(time.RFC3339Nano))
+	} else {
+		fmt.Fprintf(&b, "\nnext poll: since=%s", out.Until.UTC().Format(time.RFC3339Nano))
 	}
 	return reply(b.String(), out)
 }
@@ -446,9 +470,9 @@ func (t *toolset) listTags(ctx context.Context, _ *mcp.CallToolRequest, _ noArgs
 		return nil, TagsOut{}, err
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "%d tags", len(tags))
+	b.WriteString(countNoun(len(tags), "tag"))
 	for _, g := range tags {
-		fmt.Fprintf(&b, "\n%s: %d targets", g.Name, g.TargetCount)
+		fmt.Fprintf(&b, "\n%s: %s", g.Name, countNoun(g.TargetCount, "target"))
 	}
 	return reply(b.String(), TagsOut{Tags: tags})
 }
@@ -482,8 +506,8 @@ func (t *toolset) summary(ctx context.Context, _ *mcp.CallToolRequest, _ noArgs)
 
 	tot := sum.Totals
 	var b strings.Builder
-	fmt.Fprintf(&b, "%d targets: %d ok, %d unreachable, %d unresolved, %d pending\n",
-		tot.Targets, tot.ByReachability["ok"], tot.ByReachability["unreachable"],
+	fmt.Fprintf(&b, "%s: %d ok, %d unreachable, %d unresolved, %d pending\n",
+		countNoun(tot.Targets, "target"), tot.ByReachability["ok"], tot.ByReachability["unreachable"],
 		tot.ByReachability["unresolved"], tot.ByReachability["pending"])
 	fmt.Fprintf(&b, "certificates: %d expiring within %d days, %d expired; weak SSL (below B): %d; open ports: %d; CSP issues: %d\n",
 		tot.ExpiringCerts, int(t.svc.CertExpiryWindow()/(24*time.Hour)), tot.ExpiredCerts,

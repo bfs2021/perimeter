@@ -329,7 +329,7 @@ func TestTargetHistory(t *testing.T) {
 
 	wantSummaries := []string{
 		"unreachable", "ports 22,443", "ports 443",
-		"CSP 1 findings",
+		"CSP 1 finding",
 		"grade C → B", "grade A → C", "grade A",
 	}
 	page, err := f.svc.TargetHistory(f.ctx, id, 3, 0)

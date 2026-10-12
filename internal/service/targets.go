@@ -107,13 +107,20 @@ type SSLDetail struct {
 	LastChecked     time.Time  `json:"last_checked"`
 }
 
+// CSPFinding is a csp.Finding with the level its severity maps to, which the
+// numeric severity alone does not convey.
+type CSPFinding struct {
+	csp.Finding
+	Level string `json:"level"`
+}
+
 // CSPDetail is the newest CSP evaluation of a target.
 type CSPDetail struct {
-	Header      string        `json:"header,omitempty"`
-	Findings    []csp.Finding `json:"findings,omitempty"`
-	ProbeError  string        `json:"probe_error,omitempty"`
-	FirstSeen   time.Time     `json:"first_seen"`
-	LastChecked time.Time     `json:"last_checked"`
+	Header      string       `json:"header,omitempty"`
+	Findings    []CSPFinding `json:"findings,omitempty"`
+	ProbeError  string       `json:"probe_error,omitempty"`
+	FirstSeen   time.Time    `json:"first_seen"`
+	LastChecked time.Time    `json:"last_checked"`
 }
 
 // HistoryEntry is one SSL, CSP or port scan row in a target's history.
@@ -166,7 +173,7 @@ func (q TargetQuery) filter() (storage.TargetFilter, error) {
 		return f, invalid("ssl_grade", "unknown grade %q", q.SSLGrade)
 	}
 	if q.SSLBelow != "" && !storage.IsGrade(q.SSLBelow) {
-		return f, invalid("ssl_below", "unknown grade %q", q.SSLBelow)
+		return f, invalid("ssl_below", "unknown grade %q; valid grades: A+, A, A-, B, C, D, E, F, T, M", q.SSLBelow)
 	}
 	if q.Port < 0 || q.Port > 65535 {
 		return f, invalid("port", "must be between 1 and 65535")
@@ -327,9 +334,13 @@ func (s *Service) GetTarget(ctx context.Context, id int) (*TargetDetail, error) 
 	}
 	if len(cspScans) > 0 {
 		sc := cspScans[0]
+		findings := make([]CSPFinding, 0, len(sc.Findings))
+		for _, f := range sc.Findings {
+			findings = append(findings, CSPFinding{Finding: f, Level: f.Severity.Level()})
+		}
 		d.CSP = &CSPDetail{
 			Header:      sc.CspHeader,
-			Findings:    sc.Findings,
+			Findings:    findings,
 			ProbeError:  sc.ProbeError,
 			FirstSeen:   sc.ScannedAt,
 			LastChecked: sc.LastSeenAt,
@@ -388,7 +399,7 @@ func (s *Service) TargetHistory(ctx context.Context, id, limit, offset int) (Pag
 		} else {
 			count := len(sc.Findings)
 			e.FindingsCount = &count
-			e.Summary = fmt.Sprintf("CSP %d findings", count)
+			e.Summary = "CSP " + findingCount(count)
 		}
 		all = append(all, e)
 	}

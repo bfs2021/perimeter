@@ -62,7 +62,16 @@ func cspText(n int) string {
 	if n == 0 {
 		return "CSP ok"
 	}
-	return fmt.Sprintf("CSP %d findings", n)
+	return "CSP " + countNoun(n, "finding")
+}
+
+// countNoun renders a count with the noun in the right plural: "1 tag",
+// "2 tags".
+func countNoun(n int, noun string) string {
+	if n == 1 {
+		return "1 " + noun
+	}
+	return fmt.Sprintf("%d %ss", n, noun)
 }
 
 // moreText says how to reach the rest of a list, or "" when the page is the

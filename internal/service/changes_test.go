@@ -74,8 +74,9 @@ func TestChangesSince(t *testing.T) {
 	f.csp("a.test", 3)                                             // unchanged: no row
 	f.target("c.test")                                             // added
 	f.ip("c.test", "10.0.0.3")
-	f.ports("10.0.0.3", 80)                          // first port scan of an IP: not a change
+	f.ports("10.0.0.3", 80)                          // first port scan of an IP: 80 opened
 	f.ssl("c.test", "B", exp2027)                    // first SSL grade: "" -> B
+	f.csp("c.test", 2)                               // first CSP result: not checked -> 2 findings
 	f.must(f.st.DeleteTarget(f.ctx, f.id("b.test"))) // deleted
 
 	want := []wantChange{
@@ -88,14 +89,16 @@ func TestChangesSince(t *testing.T) {
 		{kind: service.ChangePortsClosed, target: "a.test", ip: "10.0.0.1", from: "8080"},
 		{kind: service.ChangeCSPChanged, target: "a.test", from: "2 findings", to: "3 findings"},
 		{kind: service.ChangeTargetAdded, target: "c.test"},
+		{kind: service.ChangePortsOpened, target: "c.test", ip: "10.0.0.3", to: "80"},
 		{kind: service.ChangeSSLGradeChanged, target: "c.test", from: "", to: "B"},
+		{kind: service.ChangeCSPChanged, target: "c.test", from: "not checked", to: "2 findings"},
 		{kind: service.ChangeTargetDeleted, target: "b.test"},
 	}
 
 	got, truncated, err := f.svc.ChangesSince(f.ctx, since, 0)
 	f.must(err)
 	if truncated {
-		t.Error("truncated with 11 changes under the default limit")
+		t.Error("truncated with 13 changes under the default limit")
 	}
 	assertChanges(t, got, want)
 	if got[0].Summary != "a.test: SSL grade A → C" {
@@ -109,7 +112,7 @@ func TestChangesSince(t *testing.T) {
 	head, truncated, err := f.svc.ChangesSince(f.ctx, since, 3)
 	f.must(err)
 	if !truncated {
-		t.Error("limit 3 of 11 changes should be truncated")
+		t.Error("limit 3 of 13 changes should be truncated")
 	}
 	assertChanges(t, head, want[:3])
 
@@ -134,11 +137,12 @@ func TestChangesSinceUnreachableFromTheFirstRow(t *testing.T) {
 	since := settle()
 	f.ports("10.0.0.7", 22)
 
-	// No port list was ever answered before the window, so there is nothing
-	// to diff the new ports against: only the reachability change is reported.
+	// No port list was ever answered before the window, so this is the IP's
+	// first answered scan: it is reachable again and its ports are new.
 	got, _, err := f.svc.ChangesSince(f.ctx, since, 0)
 	f.must(err)
 	assertChanges(t, got, []wantChange{
 		{kind: service.ChangeBecameReachable, target: "10.0.0.7", ip: "10.0.0.7", from: "unreachable", to: "reachable"},
+		{kind: service.ChangePortsOpened, target: "10.0.0.7", ip: "10.0.0.7", to: "22"},
 	})
 }

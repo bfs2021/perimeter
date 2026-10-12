@@ -321,6 +321,13 @@ func (s *Service) inputOf(ctx context.Context, id int) (string, error) {
 	return t.Input, nil
 }
 
+// TargetInput returns the input of a target, live or soft-deleted, so replies
+// can say "hostim.dev (#12)" instead of a bare id. A missing target is
+// ErrNotFound.
+func (s *Service) TargetInput(ctx context.Context, id int) (string, error) {
+	return s.inputOf(ctx, id)
+}
+
 // notFound maps the storage's missing-target error to ErrNotFound.
 func notFound(err error) error {
 	if errors.Is(err, storage.ErrTargetNotFound) {

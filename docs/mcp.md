@@ -36,7 +36,7 @@ These are listed only for write tokens of admins and members.
 | Tool | What it does |
 |------|--------------|
 | `add_targets` | Starts tracking hosts, IP addresses or URLs (reduced to the host). Adding is additive and safe to repeat. Up to 1000 entries per call. |
-| `set_tags` | Changes the tags of one target. `mode` is `replace` (sets exactly this list, `[]` removes all), `add` or `remove`. The tags must already exist; admins create them in the web UI. |
+| `set_tags` | Changes the tags of one target. `mode` is `add` (the default), `remove` or `replace` (sets exactly this list, `[]` removes all). The tags must already exist; admins create them in the web UI. |
 | `delete_target` | Soft-deletes a target. Its history is kept. |
 | `restore_target` | Brings a soft-deleted target back with its history. |
 | `rescan` | Queues scans of up to 50 targets, given as names or ids. A target that was scanned recently is not queued, and the reply gives its `retry_at` time. |
@@ -46,7 +46,7 @@ Admin-only operations (users, invites, roles, importers, notifiers, tag creation
 ## Limits
 
 - `list_targets`, `target_history` and `find_issues` return 25 items by default and at most 100 per call. Pass `offset` to read the next page; the reply names the next offset when more exist. `find_issues` applies `limit` and `offset` to each category.
-- `changes_since` returns 25 changes by default and at most 100. When `truncated` is true, call again with `since` set to `until`.
+- `changes_since` returns 25 changes by default and at most 100. `until` is the time of the last change, or `since` when there is none. When `truncated` is true, call again at once with `since` set to `until`; otherwise poll later from `until`.
 - `rescan` takes at most 50 targets per call. The REST rescan endpoint takes up to 500.
 - Every MCP call counts against the token's limit of 120 requests per minute, the same limit as the REST API. A call over the limit fails with HTTP 429 and a `Retry-After` header.
 

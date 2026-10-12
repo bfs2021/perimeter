@@ -273,8 +273,8 @@ func (s *Server) errorHandler(c *fiber.Ctx, err error) error {
 		log.Printf("%s %s: %v", c.Method(), c.Path(), err)
 		msg = "An unexpected error occurred. Check the server log for details."
 	}
-	// The /api/ routes answer in JSON, whatever went wrong.
-	if strings.HasPrefix(c.Path(), "/api/") {
+	// The /api/ and /mcp routes answer in JSON, whatever went wrong.
+	if strings.HasPrefix(c.Path(), "/api/") || c.Path() == "/mcp" {
 		return apiError(c, code, apiErrorCode(code), msg)
 	}
 	title := "Something went wrong"

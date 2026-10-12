@@ -309,6 +309,8 @@ curl -H "Authorization: Bearer prm_..." "https://perimeter.example.com/api/v1/ch
 - `until` is the time of the last change in the reply, or `since` itself when there is none. It is written with nanoseconds, so passing it back does not repeat a change.
 - When `truncated` is `true`, more changes follow. Call again at once with `since` set to `until`.
 - When `truncated` is `false`, wait, then call again with `since` set to `until`.
+- A reply never splits changes that share a time, so it can hold a few more than `limit`, or a few less.
+- A target's first results count as changes: its first SSL grade (from none), its first CSP result (from `not checked`), and the ports open on its IP's first answered scan.
 
 Change kinds: `target_added`, `target_deleted`, `ssl_grade_changed`, `cert_renewed`, `ports_opened`, `ports_closed`, `csp_changed`, `became_unreachable` and `became_reachable`. `from` and `to` are set when the change has a before and an after value, and `ip` when it concerns one address.
 

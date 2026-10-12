@@ -117,7 +117,10 @@ func (f *fixture) seed() {
 	f.must(f.st.SaveSSLScan(f.ctx, "mail.example.org", storage.SSLResult{
 		Grade: "C", Status: "READY", CertIssuer: "Test CA", CertExpiry: time.Now().Add(5 * 24 * time.Hour),
 	}))
-	f.must(f.st.SaveCSPScan(f.ctx, "mail.example.org", "default-src 'self'", make([]csp.Finding, 2)))
+	f.must(f.st.SaveCSPScan(f.ctx, "mail.example.org", "default-src 'self'", []csp.Finding{
+		{Type: csp.TypeScriptUnsafeInline, Severity: csp.SeverityHigh, Directive: "script-src", Value: "'unsafe-inline'", Description: "inline script allowed"},
+		{Type: csp.TypeMissingDirectives, Severity: csp.SeverityInfo, Description: "no default-src"},
+	}))
 
 	f.must(f.st.SaveSSLScan(f.ctx, "expired.test", storage.SSLResult{
 		Grade: "F", Status: "READY", CertIssuer: "Test CA", CertExpiry: time.Now().Add(-3 * 24 * time.Hour),
@@ -252,6 +255,9 @@ func TestToolAnnotationsMarkReadAndWrite(t *testing.T) {
 		if tl.Annotations.ReadOnlyHint != isRead {
 			t.Errorf("%s: ReadOnlyHint = %v, want %v", tl.Name, tl.Annotations.ReadOnlyHint, isRead)
 		}
+		if isRead && !tl.Annotations.IdempotentHint {
+			t.Errorf("%s: read tool must set IdempotentHint", tl.Name)
+		}
 		if isRead && (tl.Annotations.OpenWorldHint == nil || *tl.Annotations.OpenWorldHint) {
 			t.Errorf("%s: read tool must set OpenWorldHint false", tl.Name)
 		}
@@ -303,6 +309,16 @@ func TestReadToolsAgainstSeededData(t *testing.T) {
 		wantErr(t, call(t, cs, "list_targets", map[string]any{"sort": "nope"}), "sort")
 	})
 
+	t.Run("list_targets bad grade lists the valid ones", func(t *testing.T) {
+		res := call(t, cs, "list_targets", map[string]any{"ssl_below": "Z"})
+		wantErr(t, res, "ssl_below")
+		for _, g := range []string{"A+", "B", "F", "M"} {
+			if !strings.Contains(text(res), g) {
+				t.Errorf("error text lacks grade %q: %s", g, text(res))
+			}
+		}
+	})
+
 	t.Run("list_targets paging text", func(t *testing.T) {
 		res := call(t, cs, "list_targets", map[string]any{"limit": 2})
 		if !strings.Contains(text(res), "2 more; pass offset=2") {
@@ -317,6 +333,11 @@ func TestReadToolsAgainstSeededData(t *testing.T) {
 		}
 		if !strings.Contains(text(res), "IP 10.0.0.1: open ports 22, 443") {
 			t.Errorf("get_target text:\n%s", text(res))
+		}
+		for _, want := range []string{"state: ok", "tags: prod", "checked ", "SSL: grade A (READY)"} {
+			if !strings.Contains(text(res), want) {
+				t.Errorf("get_target text lacks %q:\n%s", want, text(res))
+			}
 		}
 		var d service.TargetDetail
 		decode(t, res, &d)
@@ -334,6 +355,19 @@ func TestReadToolsAgainstSeededData(t *testing.T) {
 		res := call(t, cs, "get_target", map[string]any{"target": "mail.example.org"})
 		if res.IsError || !strings.Contains(text(res), "CSP 2 findings") {
 			t.Errorf("get_target mail.example.org: error %v, text %q", res.IsError, text(res))
+		}
+		for _, want := range []string{"- high script-src 'unsafe-inline': inline script allowed", "- info: no default-src"} {
+			if !strings.Contains(text(res), want) {
+				t.Errorf("get_target text lacks %q:\n%s", want, text(res))
+			}
+		}
+		var d service.TargetDetail
+		decode(t, res, &d)
+		if d.CSP == nil || len(d.CSP.Findings) != 2 {
+			t.Fatalf("csp detail = %+v", d.CSP)
+		}
+		if d.CSP.Findings[0].Level != "high" || d.CSP.Findings[1].Level != "info" {
+			t.Errorf("finding levels = %q, %q, want high and info", d.CSP.Findings[0].Level, d.CSP.Findings[1].Level)
 		}
 	})
 
@@ -426,12 +460,15 @@ func TestReadToolsAgainstSeededData(t *testing.T) {
 		if res.IsError || !strings.Contains(text(res), "added") {
 			t.Errorf("changes_since 7d: %s", text(res))
 		}
+		if !strings.Contains(text(res), "CSP not checked → 2 findings") {
+			t.Errorf("changes_since lacks the first CSP result:\n%s", text(res))
+		}
 		wantErr(t, call(t, cs, "changes_since", map[string]any{"since": "yesterday"}), "since")
 	})
 
 	t.Run("list_tags", func(t *testing.T) {
 		res := call(t, cs, "list_tags", nil)
-		if !strings.Contains(text(res), "prod: 1 targets") {
+		if !strings.Contains(text(res), "prod: 1 target") {
 			t.Errorf("list_tags text: %s", text(res))
 		}
 	})
@@ -480,6 +517,18 @@ func TestWriteToolsAuditAsMCP(t *testing.T) {
 		}
 	})
 
+	t.Run("set_tags without mode adds", func(t *testing.T) {
+		res := call(t, cs, "set_tags", map[string]any{"target": "example.com", "tags": []string{"ops"}})
+		if res.IsError {
+			t.Fatalf("set_tags: %s", text(res))
+		}
+		var out service.TargetSummary
+		decode(t, res, &out)
+		if !slices.Equal(slices.Sorted(slices.Values(out.Tags)), []string{"ops", "prod"}) {
+			t.Errorf("tags after the default add = %v", out.Tags)
+		}
+	})
+
 	t.Run("set_tags bad mode", func(t *testing.T) {
 		wantErr(t, call(t, cs, "set_tags", map[string]any{"target": "example.com", "tags": []string{}, "mode": "merge"}), "mode")
 	})
@@ -493,6 +542,9 @@ func TestWriteToolsAuditAsMCP(t *testing.T) {
 		if res.IsError {
 			t.Fatalf("delete_target: %s", text(res))
 		}
+		if !strings.Contains(text(res), "mail.example.org (#") {
+			t.Errorf("delete_target reply does not name the target: %s", text(res))
+		}
 		listed := call(t, cs, "list_targets", nil)
 		if strings.Contains(text(listed), "mail.example.org") {
 			t.Errorf("deleted target still listed:\n%s", text(listed))
@@ -502,6 +554,9 @@ func TestWriteToolsAuditAsMCP(t *testing.T) {
 		res = call(t, cs, "restore_target", map[string]any{"target": "mail.example.org"})
 		if res.IsError {
 			t.Fatalf("restore_target: %s", text(res))
+		}
+		if !strings.Contains(text(res), "mail.example.org (#") {
+			t.Errorf("restore_target reply does not name the target: %s", text(res))
 		}
 		if listed := call(t, cs, "list_targets", nil); !strings.Contains(text(listed), "mail.example.org") {
 			t.Errorf("restored target not listed:\n%s", text(listed))
@@ -519,11 +574,19 @@ func TestWriteToolsAuditAsMCP(t *testing.T) {
 		if len(out.Queued) != 2 {
 			t.Errorf("queued = %v, want both", out.Queued)
 		}
+		for _, want := range []string{"queued: example.com (#", "expired.test (#"} {
+			if !strings.Contains(text(res), want) {
+				t.Errorf("rescan reply does not name the targets: %s", text(res))
+			}
+		}
 		again := call(t, cs, "rescan", map[string]any{"targets": []string{"example.com"}})
 		var second service.RescanResult
 		decode(t, again, &second)
 		if len(second.CoolingDown) != 1 || len(second.Queued) != 0 {
 			t.Errorf("second rescan = %+v, want cooling down", second)
+		}
+		if !strings.Contains(text(again), "cooling down: example.com (#") {
+			t.Errorf("cooldown reply does not name the target: %s", text(again))
 		}
 	})
 
