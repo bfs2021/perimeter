@@ -27,6 +27,7 @@ import (
 	"perimeter/internal/auth"
 	"perimeter/internal/importer"
 	"perimeter/internal/notifier"
+	"perimeter/internal/service"
 	"perimeter/internal/storage"
 
 	"github.com/gofiber/fiber/v2"
@@ -59,6 +60,8 @@ type Server struct {
 	// sslScanning is whether SSL Labs scanning runs; a rescan only flags SSL
 	// when a producer will pick it up.
 	sslScanning bool
+	// svc answers the read queries of the /api/v1 and MCP routes.
+	svc *service.Service
 }
 
 // defaultRescanCooldown is the default wait between rescan requests of one
@@ -81,6 +84,7 @@ func New(s storage.Storage, a *auth.Auth, client *ent.Client, registry *importer
 		certExpiryWindow:  certExpiryWindow,
 		dashboardPageSize: dashboardPageSize,
 		rescanCooldown:    defaultRescanCooldown,
+		svc:               service.New(s, client, certExpiryWindow),
 	}
 	srv.SetAPIRateLimit(defaultAPIRateLimit)
 

@@ -47,10 +47,16 @@ type Change struct {
 // changes followed the returned ones.
 func (s *Service) ChangesSince(ctx context.Context, since time.Time, limit int) ([]Change, bool, error) {
 	limit = clampLimit(limit, 200, 1000)
+	// SQLite stores times as text with the server's local offset, so the
+	// bound must carry that offset to compare correctly.
+	since = since.Local()
 	all, err := s.allChangesSince(ctx, since)
 	if err != nil {
 		return nil, false, err
 	}
+	// Stored text carries a monotonic suffix that a parsed bound lacks, so the
+	// change at exactly since compares as newer. A poll wants strictly after.
+	all = slices.DeleteFunc(all, func(c Change) bool { return !c.At.After(since) })
 	if len(all) > limit {
 		return all[:limit], true, nil
 	}
