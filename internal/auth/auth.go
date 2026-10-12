@@ -256,11 +256,13 @@ func (a *Auth) OIDCResolveUser(ctx context.Context, claims *OIDCClaims) (*ent.Us
 	// Existing user
 	u, err := a.client.User.Query().Where(user.EmailEQ(claims.Email)).Only(ctx)
 	if err == nil {
-		now := time.Now()
-		if err := a.client.User.UpdateOne(u).SetLastLoginAt(now).Exec(ctx); err != nil {
-			log.Printf("auth: failed to update last login: %v", err)
+		// An existing account with two-factor on still owes its second factor,
+		// so its login is marked only after the code (see MarkLogin).
+		if !u.TotpEnabled {
+			if err := a.MarkLogin(ctx, u); err != nil {
+				log.Printf("auth: failed to update last login: %v", err)
+			}
 		}
-		u.LastLoginAt = &now
 		return u, nil
 	}
 	if !ent.IsNotFound(err) {

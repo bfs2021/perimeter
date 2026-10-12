@@ -385,7 +385,12 @@ func (s *Server) handleOIDCCallback(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusForbidden, "Access denied — no account or invite found for this email")
 	}
 
-	// No second factor here: the identity provider is responsible for MFA.
+	// OIDC matches accounts by email, so a password account with two-factor on
+	// can also arrive here. It gets the same code prompt as a password login;
+	// otherwise signing in through the identity provider would skip its 2FA.
+	if u.TotpEnabled {
+		return s.startSecondFactor(c, u)
+	}
 	return s.createSessionAndRedirect(c, u)
 }
 
