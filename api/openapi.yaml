@@ -1025,7 +1025,7 @@ components:
           description: Host names or IP addresses, one per entry.
     ImportResult:
       type: object
-      required: [added, existing, restored, invalid]
+      required: [added, existing, restored, invalid, targets]
       properties:
         added:
           type: array
@@ -1043,6 +1043,22 @@ components:
           type: array
           items:
             type: string
+        targets:
+          type: array
+          description: The targets the valid lines became, in id order.
+          items:
+            $ref: "#/components/schemas/ImportedTarget"
+    ImportedTarget:
+      type: object
+      required: [id, input, status]
+      properties:
+        id:
+          type: integer
+        input:
+          type: string
+        status:
+          type: string
+          enum: [added, existing, restored]
     TagsRequest:
       type: object
       required: [tags]

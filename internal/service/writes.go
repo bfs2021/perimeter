@@ -353,6 +353,10 @@ func (s *Service) RequestRescan(ctx context.Context, a Actor, ids []int) (*Resca
 		out.CoolingDown = append(out.CoolingDown, RescanCooldown{ID: c.ID, RetryAt: c.RetryAt})
 	}
 
+	// Nothing was found, so nothing changed and there is nothing to audit.
+	if len(out.Queued) == 0 && len(out.CoolingDown) == 0 {
+		return out, nil
+	}
 	inputs, err := s.inputsOf(ctx, out.Queued)
 	if err != nil {
 		return nil, err

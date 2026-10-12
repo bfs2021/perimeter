@@ -33,6 +33,20 @@ func (s *Server) setupAPIRoutes() {
 	api.Get("/summary", s.handleAPISummary)
 	api.Get("/changes", s.handleAPIChanges)
 
+	// Writes need a write token and an admin or member role. The idempotency
+	// check runs first, for POST, PUT and DELETE only, so a repeated write gets
+	// its first answer back. Every other method passes through to the catch-all.
+	api.Use(newIdempotencyStore(idempotencyTTL, idempotencyMaxEntries).middleware())
+	writes := auth.RequireAPIWrite()
+	api.Post("/targets", writes, s.handleAPIImport)
+	api.Put("/targets/:id/tags", writes, s.handleAPISetTags)
+	api.Post("/targets/:id/tags", writes, s.handleAPIAddTags)
+	api.Delete("/targets/:id/tags/:tag", writes, s.handleAPIRemoveTag)
+	api.Delete("/targets/:id", writes, s.handleAPIDeleteTarget)
+	api.Post("/targets/:id/restore", writes, s.handleAPIRestoreTarget)
+	api.Post("/targets/:id/rescan", writes, s.handleAPIRescanTarget)
+	api.Post("/rescan", writes, s.handleAPIRescanTargets)
+
 	// Any other path under /api/v1 gets the JSON 404. Without this it would
 	// fall through to the cookie group and redirect to the login page.
 	api.Use(func(c *fiber.Ctx) error {
