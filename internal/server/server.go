@@ -60,8 +60,8 @@ type Server struct {
 	// sslScanning is whether SSL Labs scanning runs; a rescan only flags SSL
 	// when a producer will pick it up.
 	sslScanning bool
-	// svc does the writes that the audit log records. It is shared with the
-	// API and MCP, which go through it too.
+	// svc is the transport-independent layer that the API, MCP and the
+	// audited UI writes share.
 	svc *service.Service
 }
 

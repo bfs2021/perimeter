@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"time"
 
+	apidocs "perimeter/api"
 	"perimeter/internal/auth"
 
 	"github.com/gofiber/fiber/v2"
@@ -17,8 +18,20 @@ const defaultAPIRateLimit = 120
 // because that group's middleware would send a bearer request with no cookie
 // to the login page. These routes take a bearer token only.
 func (s *Server) setupAPIRoutes() {
+	// Registered before the token group so a client can read the spec before it
+	// has a token.
+	s.app.Get("/api/v1/openapi.yaml", handleOpenAPI)
+
 	api := s.app.Group("/api/v1", auth.RequireAPIToken(s.auth), s.APIRateLimitMiddleware())
 	api.Get("/me", s.handleAPIMe)
+
+	// Reads: every token scope and every role may call these.
+	api.Get("/targets", s.handleAPIListTargets)
+	api.Get("/targets/:id", s.handleAPIGetTarget)
+	api.Get("/targets/:id/history", s.handleAPITargetHistory)
+	api.Get("/tags", s.handleAPIListTags)
+	api.Get("/summary", s.handleAPISummary)
+	api.Get("/changes", s.handleAPIChanges)
 
 	// Any other path under /api/v1 gets the JSON 404. Without this it would
 	// fall through to the cookie group and redirect to the login page.
@@ -53,6 +66,13 @@ func (s *Server) APIRateLimitMiddleware() fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		return s.apiLimiter(c)
 	}
+}
+
+// handleOpenAPI serves the API description. It is public, as the spec
+// describes the auth scheme itself.
+func handleOpenAPI(c *fiber.Ctx) error {
+	c.Set(fiber.HeaderContentType, "application/yaml; charset=utf-8")
+	return c.Send(apidocs.OpenAPI)
 }
 
 // apiMe is the reply to GET /api/v1/me.
