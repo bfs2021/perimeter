@@ -11,7 +11,7 @@ Create a token on the Account page, as described in [Tokens and permissions](api
 The token scope and your role decide which tools are listed. The server builds its tool list for each request from the token and the current role:
 
 - Read tools are listed for every token.
-- Write tools are listed only for a `write` token whose owner is an admin or member. A read-only caller does not see them at all.
+- Write tools are listed only for a `write` token whose owner is an admin or member. A read-only caller does not see them at all. The instructions sent at connection say which case applies and, for a read-only connection, why (read token or viewer role), so an agent can tell the user what to change.
 
 ## Tools
 

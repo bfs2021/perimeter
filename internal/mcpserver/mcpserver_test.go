@@ -289,6 +289,25 @@ func TestInstructionsDescribeTheFlow(t *testing.T) {
 	}
 }
 
+func TestInstructionsSayWhyAConnectionIsReadOnly(t *testing.T) {
+	f := newFixture(t)
+	for _, tc := range []struct {
+		email string
+		role  user.Role
+		scope apitoken.Scope
+		want  string
+	}{
+		{"writer@test.com", user.RoleMember, apitoken.ScopeWrite, "can also change data"},
+		{"reader@test.com", user.RoleMember, apitoken.ScopeRead, "token has read scope"},
+		{"viewer@test.com", user.RoleViewer, apitoken.ScopeRead, "role is viewer"},
+	} {
+		raw, _ := f.token(tc.email, tc.role, tc.scope)
+		if got := f.connect(raw).InitializeResult().Instructions; !strings.Contains(got, tc.want) {
+			t.Errorf("%s: instructions lack %q: %q", tc.email, tc.want, got)
+		}
+	}
+}
+
 func TestReadToolsAgainstSeededData(t *testing.T) {
 	f := newFixture(t)
 	f.seed()

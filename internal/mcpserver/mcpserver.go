@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"perimeter/ent"
+	"perimeter/ent/user"
 	"perimeter/internal/auth"
 	"perimeter/internal/service"
 
@@ -22,6 +23,20 @@ import (
 // data is and in which order a model should look at it.
 const instructions = `Perimeter monitors the external attack surface of the domains and IP addresses it tracks: open ports, SSL Labs grades and certificate expiry, and Content-Security-Policy headers.
 Results come from periodic scans, so the data can be hours old. Start with summary for an overview, then use find_issues or list_targets to narrow down, and get_target for the details of one target. Poll changes_since to see what is new since a given time.`
+
+// accessNote tells the model what this connection may change. Without it, a
+// model on a read-only token concludes that no write tools exist at all,
+// instead of telling the user how to get them.
+func accessNote(u *ent.User, tok *ent.APIToken) string {
+	switch {
+	case service.CanWrite(u, tok):
+		return "This connection can also change data: add_targets, set_tags, delete_target, restore_target and rescan."
+	case u.Role == user.RoleViewer:
+		return "This connection is read-only because the user's Perimeter role is viewer. To add, tag, delete or rescan targets, an admin must give the user the member role, and the user needs a token with write scope."
+	default:
+		return "This connection is read-only because its token has read scope. To add, tag, delete or rescan targets, the user can create a token with write scope under Account in Perimeter."
+	}
+}
 
 // Handler serves the MCP endpoint. Every request gets a server built for the
 // token it carries, so the tools a client sees match what that token may do.
@@ -70,7 +85,7 @@ func (h *Handler) serverFor(r *http.Request) *mcp.Server {
 // the role allows changes, so a read-only caller does not see them at all.
 func (h *Handler) newServer(u *ent.User, tok *ent.APIToken) *mcp.Server {
 	srv := mcp.NewServer(&mcp.Implementation{Name: "perimeter", Version: h.version}, &mcp.ServerOptions{
-		Instructions: instructions,
+		Instructions: instructions + "\n" + accessNote(u, tok),
 		SchemaCache:  h.cache,
 	})
 	t := &toolset{
