@@ -179,6 +179,7 @@ func (s *Server) setupRoutes() {
 	authed.Get("/users", adminOnly, s.handleUsers)
 	authed.Post("/users/:id/delete", adminOnly, s.handleDeleteUser)
 	authed.Post("/users/:id/2fa/reset", adminOnly, s.handleResetTOTP)
+	authed.Post("/users/:id/role", adminOnly, s.handleChangeRole)
 	authed.Post("/importers", adminOnly, s.handleCreateImporter)
 	authed.Post("/importers/:id/delete", adminOnly, s.handleDeleteImporter)
 	authed.Post("/importers/:id/toggle", adminOnly, s.handleToggleImporter)
@@ -1194,6 +1195,66 @@ func (s *Server) handleDeleteUser(c *fiber.Ctx) error {
 	}
 
 	setFlash(c, flash{Kind: "success", Message: "User deleted."})
+	return c.Redirect("/settings", fiber.StatusSeeOther)
+}
+
+// handleChangeRole sets a user's role. Admins are locked: an admin's role can
+// not be changed from here, so at least one admin always remains and admins
+// cannot demote each other.
+func (s *Server) handleChangeRole(c *fiber.Ctx) error {
+	id, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid ID")
+	}
+
+	role := user.Role(c.FormValue("role"))
+	if user.RoleValidator(role) != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid role")
+	}
+
+	currentUser := auth.GetUser(c)
+	if currentUser.ID == id {
+		setFlash(c, flash{Kind: "error", Message: "Cannot change your own role."})
+		return c.Redirect("/settings", fiber.StatusSeeOther)
+	}
+
+	target, err := s.client.User.Get(c.Context(), id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return fiber.NewError(fiber.StatusNotFound, "User not found")
+		}
+		return err
+	}
+
+	if target.Role == user.RoleAdmin {
+		return fiber.NewError(fiber.StatusForbidden, "An admin's role cannot be changed")
+	}
+
+	if target.Role == role {
+		setFlash(c, flash{Kind: "success", Message: target.Email + " is already a " + role.String() + "."})
+		return c.Redirect("/settings", fiber.StatusSeeOther)
+	}
+
+	// The admin check is repeated in the update, so a user promoted by another
+	// admin since the read above is not demoted.
+	n, err := s.client.User.Update().
+		Where(user.ID(id), user.RoleNEQ(user.RoleAdmin)).
+		SetRole(role).
+		Save(c.Context())
+	if err != nil {
+		log.Printf("change role of user %d to %s: %v", id, role, err)
+		setFlash(c, flash{Kind: "error", Message: "Could not change the role. Check the server log for details."})
+		return c.Redirect("/settings", fiber.StatusSeeOther)
+	}
+	if n == 0 {
+		return fiber.NewError(fiber.StatusForbidden, "An admin's role cannot be changed")
+	}
+
+	article := "a "
+	if role == user.RoleAdmin {
+		article = "an "
+	}
+	setFlash(c, flash{Kind: "success", Message: target.Email + " is now " + article + role.String() + "."})
 	return c.Redirect("/settings", fiber.StatusSeeOther)
 }
 

@@ -48,8 +48,20 @@
       <td>{{.Email}}</td>
       <td>{{.Name}}</td>
       <td>
+        {{if or (eq .Role.String "admin") (eq $.User.ID .ID)}}
         {{if eq .Role.String "admin"}}<span class="badge badge-blue">admin</span>
         {{else}}<span class="badge badge-gray">{{.Role.String}}</span>{{end}}
+        {{else}}
+        <form method="POST" action="/users/{{.ID}}/role" style="display:inline;"
+          onsubmit="return this.role.value !== 'admin' || confirm('Make {{.Email}} an admin? Admins cannot be demoted from the UI.');">
+          <select name="role" aria-label="Role for {{.Email}}">
+            <option value="viewer" {{if eq .Role.String "viewer"}}selected{{end}}>Viewer</option>
+            <option value="member" {{if eq .Role.String "member"}}selected{{end}}>Member</option>
+            <option value="admin">Admin</option>
+          </select>
+          <button type="submit">Save</button>
+        </form>
+        {{end}}
       </td>
       <td>
         {{if .TotpEnabled}}<span class="badge badge-green">on</span>
