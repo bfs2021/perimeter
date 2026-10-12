@@ -53,6 +53,11 @@ func New(st storage.Storage, client *ent.Client, certExpiryWindow time.Duration)
 	return &Service{st: st, client: client, certExpiryWindow: certExpiryWindow}
 }
 
+// CertExpiryWindow is the horizon for "expiring soon", as configured.
+func (s *Service) CertExpiryWindow() time.Duration {
+	return s.certExpiryWindow
+}
+
 // SetRescanConfig sets how long a target waits between rescan requests and
 // whether SSL Labs scanning runs. A rescan flags SSL only when it runs.
 func (s *Service) SetRescanConfig(cooldown time.Duration, sslScanning bool) {

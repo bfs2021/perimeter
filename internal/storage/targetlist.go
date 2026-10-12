@@ -49,6 +49,8 @@ type TargetFilter struct {
 	// the badge's daysUntil (issue #42). Certificates that already
 	// expired are included. 0 means no constraint.
 	ExpiringWithin time.Duration
+	// Expired keeps targets whose certificate has already expired.
+	Expired bool
 }
 
 // Sort fields accepted by TargetSort.Field.
@@ -150,6 +152,12 @@ func targetPredicates(f TargetFilter) ([]predicate.Target, error) {
 		ps = append(ps,
 			target.LatestCertExpiryNotNil(),
 			target.LatestCertExpiryLT(time.Now().Add(f.ExpiringWithin+24*time.Hour)),
+		)
+	}
+	if f.Expired {
+		ps = append(ps,
+			target.LatestCertExpiryNotNil(),
+			target.LatestCertExpiryLT(time.Now()),
 		)
 	}
 	return ps, nil
