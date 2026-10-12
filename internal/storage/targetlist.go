@@ -25,6 +25,8 @@ import (
 // SQL against the summary columns (issue #14), except Port, which joins
 // through ips -> port_scans -> ports.
 type TargetFilter struct {
+	// Search keeps targets whose input contains it, ignoring case.
+	Search string
 	// States keeps targets in any of these reachability states.
 	States []target.Reachability
 	// Tag keeps targets carrying the tag with this name.
@@ -101,6 +103,9 @@ var ErrInvalidSort = errors.New("invalid sort field")
 // both use it, so the page and the stat cards always agree on the matches.
 func targetPredicates(f TargetFilter) ([]predicate.Target, error) {
 	var ps []predicate.Target
+	if f.Search != "" {
+		ps = append(ps, target.InputContainsFold(f.Search))
+	}
 	if len(f.States) > 0 {
 		ps = append(ps, target.ReachabilityIn(f.States...))
 	}
