@@ -86,6 +86,7 @@
   <button type="submit" name="format" value="json" formaction="/targets/bulk/export" disabled>Export JSON</button>
   <button type="submit" name="format" value="csv" formaction="/targets/bulk/export" disabled>Export CSV</button>
   {{if .CanWrite}}
+  <button type="submit" formaction="/targets/bulk/rescan" disabled>Rescan selected</button>
   <button type="submit" class="btn-danger" disabled>Delete selected</button>
   {{end}}
 </form>

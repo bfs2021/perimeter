@@ -128,6 +128,54 @@ func (_u *TargetUpdate) ClearResolveError() *TargetUpdate {
 	return _u
 }
 
+// SetRescanRequestedAt sets the "rescan_requested_at" field.
+func (_u *TargetUpdate) SetRescanRequestedAt(v time.Time) *TargetUpdate {
+	_u.mutation.SetRescanRequestedAt(v)
+	return _u
+}
+
+// SetNillableRescanRequestedAt sets the "rescan_requested_at" field if the given value is not nil.
+func (_u *TargetUpdate) SetNillableRescanRequestedAt(v *time.Time) *TargetUpdate {
+	if v != nil {
+		_u.SetRescanRequestedAt(*v)
+	}
+	return _u
+}
+
+// ClearRescanRequestedAt clears the value of the "rescan_requested_at" field.
+func (_u *TargetUpdate) ClearRescanRequestedAt() *TargetUpdate {
+	_u.mutation.ClearRescanRequestedAt()
+	return _u
+}
+
+// SetSslRescanPending sets the "ssl_rescan_pending" field.
+func (_u *TargetUpdate) SetSslRescanPending(v bool) *TargetUpdate {
+	_u.mutation.SetSslRescanPending(v)
+	return _u
+}
+
+// SetNillableSslRescanPending sets the "ssl_rescan_pending" field if the given value is not nil.
+func (_u *TargetUpdate) SetNillableSslRescanPending(v *bool) *TargetUpdate {
+	if v != nil {
+		_u.SetSslRescanPending(*v)
+	}
+	return _u
+}
+
+// SetCspRescanPending sets the "csp_rescan_pending" field.
+func (_u *TargetUpdate) SetCspRescanPending(v bool) *TargetUpdate {
+	_u.mutation.SetCspRescanPending(v)
+	return _u
+}
+
+// SetNillableCspRescanPending sets the "csp_rescan_pending" field if the given value is not nil.
+func (_u *TargetUpdate) SetNillableCspRescanPending(v *bool) *TargetUpdate {
+	if v != nil {
+		_u.SetCspRescanPending(*v)
+	}
+	return _u
+}
+
 // SetReachability sets the "reachability" field.
 func (_u *TargetUpdate) SetReachability(v target.Reachability) *TargetUpdate {
 	_u.mutation.SetReachability(v)
@@ -515,6 +563,18 @@ func (_u *TargetUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if _u.mutation.ResolveErrorCleared() {
 		_spec.ClearField(target.FieldResolveError, field.TypeString)
 	}
+	if value, ok := _u.mutation.RescanRequestedAt(); ok {
+		_spec.SetField(target.FieldRescanRequestedAt, field.TypeTime, value)
+	}
+	if _u.mutation.RescanRequestedAtCleared() {
+		_spec.ClearField(target.FieldRescanRequestedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.SslRescanPending(); ok {
+		_spec.SetField(target.FieldSslRescanPending, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.CspRescanPending(); ok {
+		_spec.SetField(target.FieldCspRescanPending, field.TypeBool, value)
+	}
 	if value, ok := _u.mutation.Reachability(); ok {
 		_spec.SetField(target.FieldReachability, field.TypeEnum, value)
 	}
@@ -872,6 +932,54 @@ func (_u *TargetUpdateOne) SetNillableResolveError(v *string) *TargetUpdateOne {
 // ClearResolveError clears the value of the "resolve_error" field.
 func (_u *TargetUpdateOne) ClearResolveError() *TargetUpdateOne {
 	_u.mutation.ClearResolveError()
+	return _u
+}
+
+// SetRescanRequestedAt sets the "rescan_requested_at" field.
+func (_u *TargetUpdateOne) SetRescanRequestedAt(v time.Time) *TargetUpdateOne {
+	_u.mutation.SetRescanRequestedAt(v)
+	return _u
+}
+
+// SetNillableRescanRequestedAt sets the "rescan_requested_at" field if the given value is not nil.
+func (_u *TargetUpdateOne) SetNillableRescanRequestedAt(v *time.Time) *TargetUpdateOne {
+	if v != nil {
+		_u.SetRescanRequestedAt(*v)
+	}
+	return _u
+}
+
+// ClearRescanRequestedAt clears the value of the "rescan_requested_at" field.
+func (_u *TargetUpdateOne) ClearRescanRequestedAt() *TargetUpdateOne {
+	_u.mutation.ClearRescanRequestedAt()
+	return _u
+}
+
+// SetSslRescanPending sets the "ssl_rescan_pending" field.
+func (_u *TargetUpdateOne) SetSslRescanPending(v bool) *TargetUpdateOne {
+	_u.mutation.SetSslRescanPending(v)
+	return _u
+}
+
+// SetNillableSslRescanPending sets the "ssl_rescan_pending" field if the given value is not nil.
+func (_u *TargetUpdateOne) SetNillableSslRescanPending(v *bool) *TargetUpdateOne {
+	if v != nil {
+		_u.SetSslRescanPending(*v)
+	}
+	return _u
+}
+
+// SetCspRescanPending sets the "csp_rescan_pending" field.
+func (_u *TargetUpdateOne) SetCspRescanPending(v bool) *TargetUpdateOne {
+	_u.mutation.SetCspRescanPending(v)
+	return _u
+}
+
+// SetNillableCspRescanPending sets the "csp_rescan_pending" field if the given value is not nil.
+func (_u *TargetUpdateOne) SetNillableCspRescanPending(v *bool) *TargetUpdateOne {
+	if v != nil {
+		_u.SetCspRescanPending(*v)
+	}
 	return _u
 }
 
@@ -1291,6 +1399,18 @@ func (_u *TargetUpdateOne) sqlSave(ctx context.Context) (_node *Target, err erro
 	}
 	if _u.mutation.ResolveErrorCleared() {
 		_spec.ClearField(target.FieldResolveError, field.TypeString)
+	}
+	if value, ok := _u.mutation.RescanRequestedAt(); ok {
+		_spec.SetField(target.FieldRescanRequestedAt, field.TypeTime, value)
+	}
+	if _u.mutation.RescanRequestedAtCleared() {
+		_spec.ClearField(target.FieldRescanRequestedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.SslRescanPending(); ok {
+		_spec.SetField(target.FieldSslRescanPending, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.CspRescanPending(); ok {
+		_spec.SetField(target.FieldCspRescanPending, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.Reachability(); ok {
 		_spec.SetField(target.FieldReachability, field.TypeEnum, value)

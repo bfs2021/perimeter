@@ -57,6 +57,10 @@ func init() {
 	ipDescAddress := ipFields[0].Descriptor()
 	// ip.AddressValidator is a validator for the "address" field. It is called by the builders before save.
 	ip.AddressValidator = ipDescAddress.Validators[0].(func(string) error)
+	// ipDescRescanPending is the schema descriptor for rescan_pending field.
+	ipDescRescanPending := ipFields[1].Descriptor()
+	// ip.DefaultRescanPending holds the default value on creation for the rescan_pending field.
+	ip.DefaultRescanPending = ipDescRescanPending.Default.(bool)
 	importerconfigMixin := schema.ImporterConfig{}.Mixin()
 	importerconfigMixinFields0 := importerconfigMixin[0].Fields()
 	_ = importerconfigMixinFields0
@@ -257,12 +261,20 @@ func init() {
 	targetDescResolveAttempts := targetFields[2].Descriptor()
 	// target.DefaultResolveAttempts holds the default value on creation for the resolve_attempts field.
 	target.DefaultResolveAttempts = targetDescResolveAttempts.Default.(int)
+	// targetDescSslRescanPending is the schema descriptor for ssl_rescan_pending field.
+	targetDescSslRescanPending := targetFields[5].Descriptor()
+	// target.DefaultSslRescanPending holds the default value on creation for the ssl_rescan_pending field.
+	target.DefaultSslRescanPending = targetDescSslRescanPending.Default.(bool)
+	// targetDescCspRescanPending is the schema descriptor for csp_rescan_pending field.
+	targetDescCspRescanPending := targetFields[6].Descriptor()
+	// target.DefaultCspRescanPending holds the default value on creation for the csp_rescan_pending field.
+	target.DefaultCspRescanPending = targetDescCspRescanPending.Default.(bool)
 	// targetDescLatestSslGradeRank is the schema descriptor for latest_ssl_grade_rank field.
-	targetDescLatestSslGradeRank := targetFields[6].Descriptor()
+	targetDescLatestSslGradeRank := targetFields[9].Descriptor()
 	// target.DefaultLatestSslGradeRank holds the default value on creation for the latest_ssl_grade_rank field.
 	target.DefaultLatestSslGradeRank = targetDescLatestSslGradeRank.Default.(int)
 	// targetDescOpenPortCount is the schema descriptor for open_port_count field.
-	targetDescOpenPortCount := targetFields[9].Descriptor()
+	targetDescOpenPortCount := targetFields[12].Descriptor()
 	// target.DefaultOpenPortCount holds the default value on creation for the open_port_count field.
 	target.DefaultOpenPortCount = targetDescOpenPortCount.Default.(int)
 	userMixin := schema.User{}.Mixin()

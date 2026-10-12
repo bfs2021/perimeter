@@ -10,9 +10,9 @@ import (
 )
 
 const (
-	// deleteChunkSize caps the ids in one UPDATE, well under SQLite's
-	// bound-parameter limit.
-	deleteChunkSize = 1000
+	// bulkChunkSize caps the ids in one UPDATE or IN list, well under
+	// SQLite's bound-parameter limit.
+	bulkChunkSize = 1000
 	// historyBatchSize caps the targets loaded per query, so eager-loaded
 	// scan history stays bounded however many ids there are.
 	historyBatchSize = 100
@@ -42,7 +42,7 @@ func (s *EntStorage) DeleteTargets(ctx context.Context, ids []int) (int, error) 
 	}
 	now := time.Now()
 	total := 0
-	for chunk := range slices.Chunk(ids, deleteChunkSize) {
+	for chunk := range slices.Chunk(ids, bulkChunkSize) {
 		n, err := tx.Target.Update().
 			Where(target.IDIn(chunk...), target.DeletedAtIsNil()).
 			SetDeletedAt(now).

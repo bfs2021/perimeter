@@ -18,6 +18,8 @@ type Job struct {
 	Type    JobType
 	Input   string // For Targets
 	Address string // For IPs (PortScan)
+	// Fresh asks the SSL scan for a new assessment, not a cached one (rescan).
+	Fresh bool
 }
 
 // Queue defines the interface for a job queue.

@@ -51,6 +51,7 @@ var (
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "address", Type: field.TypeString, Unique: true},
+		{Name: "rescan_pending", Type: field.TypeBool, Default: false},
 	}
 	// IpsTable holds the schema information for the "ips" table.
 	IpsTable = &schema.Table{
@@ -304,6 +305,9 @@ var (
 		{Name: "is_ip", Type: field.TypeBool, Default: false},
 		{Name: "resolve_attempts", Type: field.TypeInt, Default: 0},
 		{Name: "resolve_error", Type: field.TypeString, Nullable: true},
+		{Name: "rescan_requested_at", Type: field.TypeTime, Nullable: true},
+		{Name: "ssl_rescan_pending", Type: field.TypeBool, Default: false},
+		{Name: "csp_rescan_pending", Type: field.TypeBool, Default: false},
 		{Name: "reachability", Type: field.TypeEnum, Enums: []string{"pending", "ok", "unresolved", "unreachable"}, Default: "pending"},
 		{Name: "latest_ssl_grade", Type: field.TypeString, Nullable: true},
 		{Name: "latest_ssl_grade_rank", Type: field.TypeInt, Default: 0},
@@ -320,7 +324,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "targets_users_targets",
-				Columns:    []*schema.Column{TargetsColumns[14]},
+				Columns:    []*schema.Column{TargetsColumns[17]},
 				RefColumns: []*schema.Column{UsersColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -334,27 +338,27 @@ var (
 			{
 				Name:    "target_reachability",
 				Unique:  false,
-				Columns: []*schema.Column{TargetsColumns[8]},
+				Columns: []*schema.Column{TargetsColumns[11]},
 			},
 			{
 				Name:    "target_latest_ssl_grade_rank",
 				Unique:  false,
-				Columns: []*schema.Column{TargetsColumns[10]},
+				Columns: []*schema.Column{TargetsColumns[13]},
 			},
 			{
 				Name:    "target_latest_cert_expiry",
 				Unique:  false,
-				Columns: []*schema.Column{TargetsColumns[11]},
+				Columns: []*schema.Column{TargetsColumns[14]},
 			},
 			{
 				Name:    "target_latest_csp_finding_count",
 				Unique:  false,
-				Columns: []*schema.Column{TargetsColumns[12]},
+				Columns: []*schema.Column{TargetsColumns[15]},
 			},
 			{
 				Name:    "target_open_port_count",
 				Unique:  false,
-				Columns: []*schema.Column{TargetsColumns[13]},
+				Columns: []*schema.Column{TargetsColumns[16]},
 			},
 		},
 	}

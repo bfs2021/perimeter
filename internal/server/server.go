@@ -52,7 +52,16 @@ type Server struct {
 	certExpiryWindow time.Duration
 	// dashboardPageSize is how many targets the dashboard shows per page.
 	dashboardPageSize int
+	// rescanCooldown is how long a target waits between rescan requests.
+	rescanCooldown time.Duration
+	// sslScanning is whether SSL Labs scanning runs; a rescan only flags SSL
+	// when a producer will pick it up.
+	sslScanning bool
 }
+
+// defaultRescanCooldown is the default wait between rescan requests of one
+// target (RESCAN_COOLDOWN).
+const defaultRescanCooldown = 10 * time.Minute
 
 func New(s storage.Storage, a *auth.Auth, client *ent.Client, registry *importer.Registry, notifierReg *notifier.Registry, viewsFS fs.FS, certExpiryWindow time.Duration, dashboardPageSize int) *Server {
 	engine := newViewEngine(viewsFS)
@@ -69,6 +78,7 @@ func New(s storage.Storage, a *auth.Auth, client *ent.Client, registry *importer
 		notifierRegistry:  notifierReg,
 		certExpiryWindow:  certExpiryWindow,
 		dashboardPageSize: dashboardPageSize,
+		rescanCooldown:    defaultRescanCooldown,
 	}
 
 	app := fiber.New(fiber.Config{
@@ -85,6 +95,17 @@ func New(s storage.Storage, a *auth.Auth, client *ent.Client, registry *importer
 // main, after the server, so it is set here instead of in New.
 func (s *Server) SetImporterSyncer(sy importerSyncer) {
 	s.syncer = sy
+}
+
+// SetRescanCooldown sets how long a target waits between rescan requests.
+func (s *Server) SetRescanCooldown(d time.Duration) {
+	s.rescanCooldown = d
+}
+
+// SetSSLScanning tells the server whether SSL Labs scanning runs, so that a
+// rescan flags SSL only when the SSL producer will act on it.
+func (s *Server) SetSSLScanning(enabled bool) {
+	s.sslScanning = enabled
 }
 
 // newViewEngine loads the templates from viewsFS and registers the template
@@ -159,7 +180,9 @@ func (s *Server) setupRoutes() {
 	// Registered before /targets/:id/... so "bulk" is not read as an id.
 	authed.Post("/targets/bulk/export", s.handleBulkExport)
 	authed.Post("/targets/bulk/delete", canWrite, s.handleBulkDelete)
+	authed.Post("/targets/bulk/rescan", canWrite, s.handleBulkRescan)
 	authed.Post("/targets/:id/delete", canWrite, s.handleDeleteTarget)
+	authed.Post("/targets/:id/rescan", canWrite, s.handleRescanTarget)
 	authed.Post("/targets/:id/restore", canWrite, s.handleRestoreTarget)
 	authed.Post("/targets/:id/purge", adminOnly, s.handlePurgeTarget)
 	authed.Post("/targets/:id/tags", canWrite, s.handleUpdateTargetTags)
@@ -952,14 +975,15 @@ func (s *Server) handleTargetDetails(c *fiber.Ctx) error {
 	allTags, _ := s.client.Tag.Query().All(c.Context())
 
 	return c.Render("views/target", s.templateData(c, fiber.Map{
-		"Title":         "Target Details",
-		"Target":        target,
-		"AllTags":       allTags,
-		"IPRows":        ipRows,
-		"SSLScans":      sslScans,
-		"SSLPagination": sslPagination,
-		"CSPScans":      cspScans,
-		"CSPPagination": cspPagination,
+		"Title":           "Target Details",
+		"Target":          target,
+		"AllTags":         allTags,
+		"IPRows":          ipRows,
+		"RescanRequested": rescanRequested(target),
+		"SSLScans":        sslScans,
+		"SSLPagination":   sslPagination,
+		"CSPScans":        cspScans,
+		"CSPPagination":   cspPagination,
 	}), "views/layouts/main")
 }
 
@@ -991,6 +1015,54 @@ func (s *Server) targetLabel(ctx context.Context, id int) string {
 		return "target " + strconv.Itoa(id)
 	}
 	return t.Input
+}
+
+// rescanKinds is what a rescan from this server queues: SSL only when SSL Labs
+// scanning runs.
+func (s *Server) rescanKinds() storage.RescanKinds {
+	return storage.RescanKinds{SSL: s.sslScanning, CSP: true, Ports: true}
+}
+
+// rescanRequested returns when the pending rescan of t was requested, or nil
+// when none is pending: no flag is set, or a stored result has cleared them.
+func rescanRequested(t *ent.Target) *time.Time {
+	if t.RescanRequestedAt == nil {
+		return nil
+	}
+	if t.SslRescanPending || t.CspRescanPending {
+		return t.RescanRequestedAt
+	}
+	for _, i := range t.Edges.Ips {
+		if i.RescanPending {
+			return t.RescanRequestedAt
+		}
+	}
+	return nil
+}
+
+// handleRescanTarget queues an on-demand scan of one target. It flashes either
+// that the rescan is queued, or when the target may be rescanned again.
+func (s *Server) handleRescanTarget(c *fiber.Ctx) error {
+	id, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid ID")
+	}
+
+	label := s.targetLabel(c.Context(), id)
+	res, err := s.storage.RequestRescan(c.Context(), []int{id}, time.Now(), s.rescanCooldown, s.rescanKinds())
+	if err != nil {
+		return err
+	}
+	if len(res.NotFound) > 0 {
+		return fiber.NewError(fiber.StatusNotFound, "Target not found")
+	}
+	if len(res.CoolingDown) > 0 {
+		retry := res.CoolingDown[0].RetryAt.Format("15:04")
+		setFlash(c, flash{Kind: "error", Message: fmt.Sprintf("%s was rescanned recently; try again after %s.", label, retry)})
+	} else {
+		setFlash(c, flash{Kind: "success", Message: "Rescan queued for " + label + "."})
+	}
+	return c.Redirect("/targets/"+strconv.Itoa(id), fiber.StatusSeeOther)
 }
 
 func (s *Server) handleDeletedTargets(c *fiber.Ctx) error {
@@ -1980,6 +2052,22 @@ func (s *Server) handleBulkDelete(c *fiber.Ctx) error {
 		noun = "target"
 	}
 	setFlash(c, flash{Kind: "success", Message: fmt.Sprintf("Deleted %d %s.", n, noun)})
+	return c.Redirect("/", fiber.StatusSeeOther)
+}
+
+// handleBulkRescan queues a rescan of the resolved selection. Unlike delete it
+// needs no confirmation: a rescan changes no targets, only the scan queue.
+func (s *Server) handleBulkRescan(c *fiber.Ctx) error {
+	ids, err := s.bulkSelection(c)
+	if err != nil {
+		return bulkError(err)
+	}
+
+	res, err := s.storage.RequestRescan(c.Context(), ids, time.Now(), s.rescanCooldown, s.rescanKinds())
+	if err != nil {
+		return err
+	}
+	setFlash(c, flash{Kind: "success", Message: fmt.Sprintf("Rescan queued for %d targets (%d cooling down).", len(res.Queued), len(res.CoolingDown))})
 	return c.Redirect("/", fiber.StatusSeeOther)
 }
 

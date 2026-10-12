@@ -1223,6 +1223,7 @@ type IPMutation struct {
 	create_time    *time.Time
 	update_time    *time.Time
 	address        *string
+	rescan_pending *bool
 	clearedFields  map[string]struct{}
 	targets        map[int]struct{}
 	removedtargets map[int]struct{}
@@ -1441,6 +1442,42 @@ func (m *IPMutation) ResetAddress() {
 	m.address = nil
 }
 
+// SetRescanPending sets the "rescan_pending" field.
+func (m *IPMutation) SetRescanPending(b bool) {
+	m.rescan_pending = &b
+}
+
+// RescanPending returns the value of the "rescan_pending" field in the mutation.
+func (m *IPMutation) RescanPending() (r bool, exists bool) {
+	v := m.rescan_pending
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRescanPending returns the old "rescan_pending" field's value of the IP entity.
+// If the IP object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *IPMutation) OldRescanPending(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRescanPending is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRescanPending requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRescanPending: %w", err)
+	}
+	return oldValue.RescanPending, nil
+}
+
+// ResetRescanPending resets all changes to the "rescan_pending" field.
+func (m *IPMutation) ResetRescanPending() {
+	m.rescan_pending = nil
+}
+
 // AddTargetIDs adds the "targets" edge to the Target entity by ids.
 func (m *IPMutation) AddTargetIDs(ids ...int) {
 	if m.targets == nil {
@@ -1583,7 +1620,7 @@ func (m *IPMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *IPMutation) Fields() []string {
-	fields := make([]string, 0, 3)
+	fields := make([]string, 0, 4)
 	if m.create_time != nil {
 		fields = append(fields, ip.FieldCreateTime)
 	}
@@ -1592,6 +1629,9 @@ func (m *IPMutation) Fields() []string {
 	}
 	if m.address != nil {
 		fields = append(fields, ip.FieldAddress)
+	}
+	if m.rescan_pending != nil {
+		fields = append(fields, ip.FieldRescanPending)
 	}
 	return fields
 }
@@ -1607,6 +1647,8 @@ func (m *IPMutation) Field(name string) (ent.Value, bool) {
 		return m.UpdateTime()
 	case ip.FieldAddress:
 		return m.Address()
+	case ip.FieldRescanPending:
+		return m.RescanPending()
 	}
 	return nil, false
 }
@@ -1622,6 +1664,8 @@ func (m *IPMutation) OldField(ctx context.Context, name string) (ent.Value, erro
 		return m.OldUpdateTime(ctx)
 	case ip.FieldAddress:
 		return m.OldAddress(ctx)
+	case ip.FieldRescanPending:
+		return m.OldRescanPending(ctx)
 	}
 	return nil, fmt.Errorf("unknown IP field %s", name)
 }
@@ -1651,6 +1695,13 @@ func (m *IPMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetAddress(v)
+		return nil
+	case ip.FieldRescanPending:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRescanPending(v)
 		return nil
 	}
 	return fmt.Errorf("unknown IP field %s", name)
@@ -1709,6 +1760,9 @@ func (m *IPMutation) ResetField(name string) error {
 		return nil
 	case ip.FieldAddress:
 		m.ResetAddress()
+		return nil
+	case ip.FieldRescanPending:
+		m.ResetRescanPending()
 		return nil
 	}
 	return fmt.Errorf("unknown IP field %s", name)
@@ -9525,6 +9579,9 @@ type TargetMutation struct {
 	resolve_attempts            *int
 	addresolve_attempts         *int
 	resolve_error               *string
+	rescan_requested_at         *time.Time
+	ssl_rescan_pending          *bool
+	csp_rescan_pending          *bool
 	reachability                *target.Reachability
 	latest_ssl_grade            *string
 	latest_ssl_grade_rank       *int
@@ -9948,6 +10005,127 @@ func (m *TargetMutation) ResolveErrorCleared() bool {
 func (m *TargetMutation) ResetResolveError() {
 	m.resolve_error = nil
 	delete(m.clearedFields, target.FieldResolveError)
+}
+
+// SetRescanRequestedAt sets the "rescan_requested_at" field.
+func (m *TargetMutation) SetRescanRequestedAt(t time.Time) {
+	m.rescan_requested_at = &t
+}
+
+// RescanRequestedAt returns the value of the "rescan_requested_at" field in the mutation.
+func (m *TargetMutation) RescanRequestedAt() (r time.Time, exists bool) {
+	v := m.rescan_requested_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRescanRequestedAt returns the old "rescan_requested_at" field's value of the Target entity.
+// If the Target object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TargetMutation) OldRescanRequestedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRescanRequestedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRescanRequestedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRescanRequestedAt: %w", err)
+	}
+	return oldValue.RescanRequestedAt, nil
+}
+
+// ClearRescanRequestedAt clears the value of the "rescan_requested_at" field.
+func (m *TargetMutation) ClearRescanRequestedAt() {
+	m.rescan_requested_at = nil
+	m.clearedFields[target.FieldRescanRequestedAt] = struct{}{}
+}
+
+// RescanRequestedAtCleared returns if the "rescan_requested_at" field was cleared in this mutation.
+func (m *TargetMutation) RescanRequestedAtCleared() bool {
+	_, ok := m.clearedFields[target.FieldRescanRequestedAt]
+	return ok
+}
+
+// ResetRescanRequestedAt resets all changes to the "rescan_requested_at" field.
+func (m *TargetMutation) ResetRescanRequestedAt() {
+	m.rescan_requested_at = nil
+	delete(m.clearedFields, target.FieldRescanRequestedAt)
+}
+
+// SetSslRescanPending sets the "ssl_rescan_pending" field.
+func (m *TargetMutation) SetSslRescanPending(b bool) {
+	m.ssl_rescan_pending = &b
+}
+
+// SslRescanPending returns the value of the "ssl_rescan_pending" field in the mutation.
+func (m *TargetMutation) SslRescanPending() (r bool, exists bool) {
+	v := m.ssl_rescan_pending
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSslRescanPending returns the old "ssl_rescan_pending" field's value of the Target entity.
+// If the Target object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TargetMutation) OldSslRescanPending(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSslRescanPending is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSslRescanPending requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSslRescanPending: %w", err)
+	}
+	return oldValue.SslRescanPending, nil
+}
+
+// ResetSslRescanPending resets all changes to the "ssl_rescan_pending" field.
+func (m *TargetMutation) ResetSslRescanPending() {
+	m.ssl_rescan_pending = nil
+}
+
+// SetCspRescanPending sets the "csp_rescan_pending" field.
+func (m *TargetMutation) SetCspRescanPending(b bool) {
+	m.csp_rescan_pending = &b
+}
+
+// CspRescanPending returns the value of the "csp_rescan_pending" field in the mutation.
+func (m *TargetMutation) CspRescanPending() (r bool, exists bool) {
+	v := m.csp_rescan_pending
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCspRescanPending returns the old "csp_rescan_pending" field's value of the Target entity.
+// If the Target object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TargetMutation) OldCspRescanPending(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCspRescanPending is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCspRescanPending requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCspRescanPending: %w", err)
+	}
+	return oldValue.CspRescanPending, nil
+}
+
+// ResetCspRescanPending resets all changes to the "csp_rescan_pending" field.
+func (m *TargetMutation) ResetCspRescanPending() {
+	m.csp_rescan_pending = nil
 }
 
 // SetReachability sets the "reachability" field.
@@ -10555,7 +10733,7 @@ func (m *TargetMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TargetMutation) Fields() []string {
-	fields := make([]string, 0, 13)
+	fields := make([]string, 0, 16)
 	if m.create_time != nil {
 		fields = append(fields, target.FieldCreateTime)
 	}
@@ -10576,6 +10754,15 @@ func (m *TargetMutation) Fields() []string {
 	}
 	if m.resolve_error != nil {
 		fields = append(fields, target.FieldResolveError)
+	}
+	if m.rescan_requested_at != nil {
+		fields = append(fields, target.FieldRescanRequestedAt)
+	}
+	if m.ssl_rescan_pending != nil {
+		fields = append(fields, target.FieldSslRescanPending)
+	}
+	if m.csp_rescan_pending != nil {
+		fields = append(fields, target.FieldCspRescanPending)
 	}
 	if m.reachability != nil {
 		fields = append(fields, target.FieldReachability)
@@ -10617,6 +10804,12 @@ func (m *TargetMutation) Field(name string) (ent.Value, bool) {
 		return m.ResolveAttempts()
 	case target.FieldResolveError:
 		return m.ResolveError()
+	case target.FieldRescanRequestedAt:
+		return m.RescanRequestedAt()
+	case target.FieldSslRescanPending:
+		return m.SslRescanPending()
+	case target.FieldCspRescanPending:
+		return m.CspRescanPending()
 	case target.FieldReachability:
 		return m.Reachability()
 	case target.FieldLatestSslGrade:
@@ -10652,6 +10845,12 @@ func (m *TargetMutation) OldField(ctx context.Context, name string) (ent.Value, 
 		return m.OldResolveAttempts(ctx)
 	case target.FieldResolveError:
 		return m.OldResolveError(ctx)
+	case target.FieldRescanRequestedAt:
+		return m.OldRescanRequestedAt(ctx)
+	case target.FieldSslRescanPending:
+		return m.OldSslRescanPending(ctx)
+	case target.FieldCspRescanPending:
+		return m.OldCspRescanPending(ctx)
 	case target.FieldReachability:
 		return m.OldReachability(ctx)
 	case target.FieldLatestSslGrade:
@@ -10721,6 +10920,27 @@ func (m *TargetMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetResolveError(v)
+		return nil
+	case target.FieldRescanRequestedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRescanRequestedAt(v)
+		return nil
+	case target.FieldSslRescanPending:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSslRescanPending(v)
+		return nil
+	case target.FieldCspRescanPending:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCspRescanPending(v)
 		return nil
 	case target.FieldReachability:
 		v, ok := value.(target.Reachability)
@@ -10851,6 +11071,9 @@ func (m *TargetMutation) ClearedFields() []string {
 	if m.FieldCleared(target.FieldResolveError) {
 		fields = append(fields, target.FieldResolveError)
 	}
+	if m.FieldCleared(target.FieldRescanRequestedAt) {
+		fields = append(fields, target.FieldRescanRequestedAt)
+	}
 	if m.FieldCleared(target.FieldLatestSslGrade) {
 		fields = append(fields, target.FieldLatestSslGrade)
 	}
@@ -10879,6 +11102,9 @@ func (m *TargetMutation) ClearField(name string) error {
 		return nil
 	case target.FieldResolveError:
 		m.ClearResolveError()
+		return nil
+	case target.FieldRescanRequestedAt:
+		m.ClearRescanRequestedAt()
 		return nil
 	case target.FieldLatestSslGrade:
 		m.ClearLatestSslGrade()
@@ -10917,6 +11143,15 @@ func (m *TargetMutation) ResetField(name string) error {
 		return nil
 	case target.FieldResolveError:
 		m.ResetResolveError()
+		return nil
+	case target.FieldRescanRequestedAt:
+		m.ResetRescanRequestedAt()
+		return nil
+	case target.FieldSslRescanPending:
+		m.ResetSslRescanPending()
+		return nil
+	case target.FieldCspRescanPending:
+		m.ResetCspRescanPending()
 		return nil
 	case target.FieldReachability:
 		m.ResetReachability()

@@ -76,6 +76,9 @@ var (
 
 	certExpiryWindow = getEnvOrDefaultDuration("CERT_EXPIRY_WINDOW", 30*24*time.Hour)
 
+	// How long a target waits between on-demand rescan requests.
+	rescanCooldown = getEnvOrDefaultDuration("RESCAN_COOLDOWN", 10*time.Minute)
+
 	dashboardPageSize = getEnvOrDefaultInt("DASHBOARD_PAGE_SIZE", 50)
 
 	sessionMaxAge    = getEnvOrDefaultDuration("SESSION_MAX_AGE", 720*time.Hour)
@@ -253,6 +256,8 @@ func main() {
 	// 8. Start Web Server
 	srv := server.New(store, authenticator, client, importerRegistry, notifierRegistry, viewsfs, certExpiryWindow, dashboardPageSize)
 	srv.SetImporterSyncer(syncLoop)
+	srv.SetRescanCooldown(rescanCooldown)
+	srv.SetSSLScanning(email != "")
 	log.Printf("Perimeter is running on http://localhost:%s", httpPort)
 	log.Fatal(srv.Listen(":" + httpPort))
 }
