@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"perimeter/ent"
 	"perimeter/ent/job"
 	"perimeter/internal/notifier"
 	"perimeter/internal/storage"
@@ -336,7 +337,7 @@ func (m *Manager) runSSLScanProducer() {
 			continue
 		}
 
-		if !m.enqueue(ctx, Job{Type: JobTypeSSLScan, Input: t.Input}) {
+		if !m.enqueue(ctx, sslJob(t)) {
 			time.Sleep(1 * time.Second)
 		}
 		time.Sleep(100 * time.Millisecond)
@@ -363,6 +364,12 @@ func (m *Manager) runCSPScanProducer() {
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
+}
+
+// sslJob is the SSL scan for t. A target picked because of a pending rescan
+// gets a fresh assessment; the flag stays set until the result is stored.
+func sslJob(t *ent.Target) Job {
+	return Job{Type: JobTypeSSLScan, Input: t.Input, Fresh: t.SslRescanPending}
 }
 
 // --- Processors ---
@@ -535,7 +542,7 @@ func (m *Manager) processSSLScan(ctx context.Context, j Job, scanner *ssl.SSLLab
 
 	prevGrade, _ := m.storage.GetPreviousSSLGrade(ctx, j.Input)
 
-	res, err := scanner.Scan(j.Input)
+	res, err := scanner.Scan(j.Input, j.Fresh)
 	if err != nil {
 		log.Printf("Worker: SSL Scan failed for %s: %v", j.Input, err)
 		saveRes := storage.SSLResult{

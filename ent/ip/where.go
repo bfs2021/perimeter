@@ -70,6 +70,11 @@ func Address(v string) predicate.IP {
 	return predicate.IP(sql.FieldEQ(FieldAddress, v))
 }
 
+// RescanPending applies equality check predicate on the "rescan_pending" field. It's identical to RescanPendingEQ.
+func RescanPending(v bool) predicate.IP {
+	return predicate.IP(sql.FieldEQ(FieldRescanPending, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.IP {
 	return predicate.IP(sql.FieldEQ(FieldCreateTime, v))
@@ -213,6 +218,16 @@ func AddressEqualFold(v string) predicate.IP {
 // AddressContainsFold applies the ContainsFold predicate on the "address" field.
 func AddressContainsFold(v string) predicate.IP {
 	return predicate.IP(sql.FieldContainsFold(FieldAddress, v))
+}
+
+// RescanPendingEQ applies the EQ predicate on the "rescan_pending" field.
+func RescanPendingEQ(v bool) predicate.IP {
+	return predicate.IP(sql.FieldEQ(FieldRescanPending, v))
+}
+
+// RescanPendingNEQ applies the NEQ predicate on the "rescan_pending" field.
+func RescanPendingNEQ(v bool) predicate.IP {
+	return predicate.IP(sql.FieldNEQ(FieldRescanPending, v))
 }
 
 // HasTargets applies the HasEdge predicate on the "targets" edge.

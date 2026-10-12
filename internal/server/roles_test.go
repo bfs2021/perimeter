@@ -76,6 +76,8 @@ func TestRoleRoutePermissions(t *testing.T) {
 		{"import submit", "POST", "/import", writeRole},
 		{"bulk delete", "POST", "/targets/bulk/delete", writeRole},
 		{"bulk export", "POST", "/targets/bulk/export", anyRole},
+		{"bulk rescan", "POST", "/targets/bulk/rescan", writeRole},
+		{"rescan target", "POST", "/targets/" + id + "/rescan", writeRole},
 		{"delete target", "POST", "/targets/" + id + "/delete", writeRole},
 		{"restore target", "POST", "/targets/" + id + "/restore", writeRole},
 		{"purge target", "POST", "/targets/" + id + "/purge", adminRole},

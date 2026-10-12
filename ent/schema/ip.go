@@ -16,6 +16,9 @@ type IP struct {
 func (IP) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("address").Unique().NotEmpty(),
+		// Set by a rescan request; the port producer scans this IP next, until
+		// a port scan result is stored.
+		field.Bool("rescan_pending").Default(false),
 	}
 }
 

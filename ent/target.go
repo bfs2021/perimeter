@@ -32,6 +32,12 @@ type Target struct {
 	ResolveAttempts int `json:"resolve_attempts,omitempty"`
 	// ResolveError holds the value of the "resolve_error" field.
 	ResolveError string `json:"resolve_error,omitempty"`
+	// RescanRequestedAt holds the value of the "rescan_requested_at" field.
+	RescanRequestedAt *time.Time `json:"rescan_requested_at,omitempty"`
+	// SslRescanPending holds the value of the "ssl_rescan_pending" field.
+	SslRescanPending bool `json:"ssl_rescan_pending,omitempty"`
+	// CspRescanPending holds the value of the "csp_rescan_pending" field.
+	CspRescanPending bool `json:"csp_rescan_pending,omitempty"`
 	// Reachability holds the value of the "reachability" field.
 	Reachability target.Reachability `json:"reachability,omitempty"`
 	// LatestSslGrade holds the value of the "latest_ssl_grade" field.
@@ -120,13 +126,13 @@ func (*Target) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case target.FieldIsIP:
+		case target.FieldIsIP, target.FieldSslRescanPending, target.FieldCspRescanPending:
 			values[i] = new(sql.NullBool)
 		case target.FieldID, target.FieldResolveAttempts, target.FieldLatestSslGradeRank, target.FieldLatestCspFindingCount, target.FieldOpenPortCount:
 			values[i] = new(sql.NullInt64)
 		case target.FieldInput, target.FieldResolveError, target.FieldReachability, target.FieldLatestSslGrade:
 			values[i] = new(sql.NullString)
-		case target.FieldCreateTime, target.FieldUpdateTime, target.FieldDeletedAt, target.FieldLatestCertExpiry:
+		case target.FieldCreateTime, target.FieldUpdateTime, target.FieldDeletedAt, target.FieldRescanRequestedAt, target.FieldLatestCertExpiry:
 			values[i] = new(sql.NullTime)
 		case target.ForeignKeys[0]: // user_targets
 			values[i] = new(sql.NullInt64)
@@ -193,6 +199,25 @@ func (_m *Target) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field resolve_error", values[i])
 			} else if value.Valid {
 				_m.ResolveError = value.String
+			}
+		case target.FieldRescanRequestedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field rescan_requested_at", values[i])
+			} else if value.Valid {
+				_m.RescanRequestedAt = new(time.Time)
+				*_m.RescanRequestedAt = value.Time
+			}
+		case target.FieldSslRescanPending:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field ssl_rescan_pending", values[i])
+			} else if value.Valid {
+				_m.SslRescanPending = value.Bool
+			}
+		case target.FieldCspRescanPending:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field csp_rescan_pending", values[i])
+			} else if value.Valid {
+				_m.CspRescanPending = value.Bool
 			}
 		case target.FieldReachability:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -322,6 +347,17 @@ func (_m *Target) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("resolve_error=")
 	builder.WriteString(_m.ResolveError)
+	builder.WriteString(", ")
+	if v := _m.RescanRequestedAt; v != nil {
+		builder.WriteString("rescan_requested_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	builder.WriteString("ssl_rescan_pending=")
+	builder.WriteString(fmt.Sprintf("%v", _m.SslRescanPending))
+	builder.WriteString(", ")
+	builder.WriteString("csp_rescan_pending=")
+	builder.WriteString(fmt.Sprintf("%v", _m.CspRescanPending))
 	builder.WriteString(", ")
 	builder.WriteString("reachability=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Reachability))

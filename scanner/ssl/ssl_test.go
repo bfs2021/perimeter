@@ -4,7 +4,10 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"sync"
 	"testing"
+	"time"
 )
 
 func TestSSLLabsScanner_Scan(t *testing.T) {
@@ -63,7 +66,7 @@ func TestSSLLabsScanner_Scan(t *testing.T) {
 	defer func() { apiBaseURL = oldURL }()
 
 	scanner := NewSSLLabsScanner("test@example.com")
-	result, err := scanner.Scan("example.com")
+	result, err := scanner.Scan("example.com", false)
 	if err != nil {
 		t.Fatalf("Scan failed: %v", err)
 	}
@@ -73,5 +76,52 @@ func TestSSLLabsScanner_Scan(t *testing.T) {
 	}
 	if result.Status != "READY" {
 		t.Errorf("Expected Status READY, got %s", result.Status)
+	}
+}
+
+// A rescan (fresh) must ask SSL Labs for a new assessment, while an ordinary
+// scan takes a recent cached one without startNew.
+func TestSSLLabsScanner_FreshStartsNewAssessment(t *testing.T) {
+	var mu sync.Mutex
+	var startNew []string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		startNew = append(startNew, r.URL.Query().Get("startNew"))
+		mu.Unlock()
+		// A READY assessment finished just now, so it is fresh enough to use.
+		now := time.Now().UnixMilli()
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(w, `{"host": "example.com", "status": "READY", "testTime": %s, "endpoints": [{"grade": "B"}]}`,
+			strconv.FormatInt(now, 10))
+	}))
+	defer ts.Close()
+
+	oldURL := apiBaseURL
+	apiBaseURL = ts.URL
+	defer func() { apiBaseURL = oldURL }()
+
+	scanner := NewSSLLabsScanner("test@example.com")
+
+	if _, err := scanner.Scan("example.com", false); err != nil {
+		t.Fatalf("cached scan failed: %v", err)
+	}
+	mu.Lock()
+	if len(startNew) != 1 || startNew[0] != "" {
+		t.Errorf("ordinary scan sent startNew=%v, want one lookup without startNew", startNew)
+	}
+	startNew = nil
+	mu.Unlock()
+
+	result, err := scanner.Scan("example.com", true)
+	if err != nil {
+		t.Fatalf("fresh scan failed: %v", err)
+	}
+	if result.Grade != "B" {
+		t.Errorf("Expected Grade B, got %s", result.Grade)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(startNew) != 1 || startNew[0] != "on" {
+		t.Errorf("fresh scan sent startNew=%v, want a single startNew=on request", startNew)
 	}
 }

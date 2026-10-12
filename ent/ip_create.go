@@ -56,6 +56,20 @@ func (_c *IPCreate) SetAddress(v string) *IPCreate {
 	return _c
 }
 
+// SetRescanPending sets the "rescan_pending" field.
+func (_c *IPCreate) SetRescanPending(v bool) *IPCreate {
+	_c.mutation.SetRescanPending(v)
+	return _c
+}
+
+// SetNillableRescanPending sets the "rescan_pending" field if the given value is not nil.
+func (_c *IPCreate) SetNillableRescanPending(v *bool) *IPCreate {
+	if v != nil {
+		_c.SetRescanPending(*v)
+	}
+	return _c
+}
+
 // AddTargetIDs adds the "targets" edge to the Target entity by IDs.
 func (_c *IPCreate) AddTargetIDs(ids ...int) *IPCreate {
 	_c.mutation.AddTargetIDs(ids...)
@@ -129,6 +143,10 @@ func (_c *IPCreate) defaults() {
 		v := ip.DefaultUpdateTime()
 		_c.mutation.SetUpdateTime(v)
 	}
+	if _, ok := _c.mutation.RescanPending(); !ok {
+		v := ip.DefaultRescanPending
+		_c.mutation.SetRescanPending(v)
+	}
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -146,6 +164,9 @@ func (_c *IPCreate) check() error {
 		if err := ip.AddressValidator(v); err != nil {
 			return &ValidationError{Name: "address", err: fmt.Errorf(`ent: validator failed for field "IP.address": %w`, err)}
 		}
+	}
+	if _, ok := _c.mutation.RescanPending(); !ok {
+		return &ValidationError{Name: "rescan_pending", err: errors.New(`ent: missing required field "IP.rescan_pending"`)}
 	}
 	return nil
 }
@@ -184,6 +205,10 @@ func (_c *IPCreate) createSpec() (*IP, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Address(); ok {
 		_spec.SetField(ip.FieldAddress, field.TypeString, value)
 		_node.Address = value
+	}
+	if value, ok := _c.mutation.RescanPending(); ok {
+		_spec.SetField(ip.FieldRescanPending, field.TypeBool, value)
+		_node.RescanPending = value
 	}
 	if nodes := _c.mutation.TargetsIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

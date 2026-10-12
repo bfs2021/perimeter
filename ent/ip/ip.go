@@ -20,6 +20,8 @@ const (
 	FieldUpdateTime = "update_time"
 	// FieldAddress holds the string denoting the address field in the database.
 	FieldAddress = "address"
+	// FieldRescanPending holds the string denoting the rescan_pending field in the database.
+	FieldRescanPending = "rescan_pending"
 	// EdgeTargets holds the string denoting the targets edge name in mutations.
 	EdgeTargets = "targets"
 	// EdgeScans holds the string denoting the scans edge name in mutations.
@@ -46,6 +48,7 @@ var Columns = []string{
 	FieldCreateTime,
 	FieldUpdateTime,
 	FieldAddress,
+	FieldRescanPending,
 }
 
 var (
@@ -73,6 +76,8 @@ var (
 	UpdateDefaultUpdateTime func() time.Time
 	// AddressValidator is a validator for the "address" field. It is called by the builders before save.
 	AddressValidator func(string) error
+	// DefaultRescanPending holds the default value on creation for the "rescan_pending" field.
+	DefaultRescanPending bool
 )
 
 // OrderOption defines the ordering options for the IP queries.
@@ -96,6 +101,11 @@ func ByUpdateTime(opts ...sql.OrderTermOption) OrderOption {
 // ByAddress orders the results by the address field.
 func ByAddress(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldAddress, opts...).ToFunc()
+}
+
+// ByRescanPending orders the results by the rescan_pending field.
+func ByRescanPending(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRescanPending, opts...).ToFunc()
 }
 
 // ByTargetsCount orders the results by targets count.

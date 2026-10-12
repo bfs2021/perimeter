@@ -20,6 +20,13 @@ func (Target) Fields() []ent.Field {
 		// Resolution backoff state (see scanner.resolveBackoff).
 		field.Int("resolve_attempts").Default(0),
 		field.String("resolve_error").Optional(),
+		// On-demand rescan (storage.RequestRescan). The request time drives
+		// the cooldown and the "Rescan requested" note; the pending flags make
+		// the SSL and CSP producers pick this target next, until a result is
+		// stored.
+		field.Time("rescan_requested_at").Optional().Nillable(),
+		field.Bool("ssl_rescan_pending").Default(false),
+		field.Bool("csp_rescan_pending").Default(false),
 		// Whether the target answers at all, kept current by the scan write
 		// paths so it can be filtered and sorted on in SQL (issue #15).
 		field.Enum("reachability").

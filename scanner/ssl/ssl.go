@@ -23,9 +23,10 @@ type SSLResult struct {
 	Vulnerabilities []string
 }
 
-// SSLScanner defines the interface for checking SSL configurations.
+// SSLScanner defines the interface for checking SSL configurations. fresh asks
+// for a new assessment instead of a cached one (a rescan).
 type SSLScanner interface {
-	Scan(target string) (*SSLResult, error)
+	Scan(target string, fresh bool) (*SSLResult, error)
 }
 
 // SSLLabsScanner implements SSLScanner using the Qualys SSL Labs API v4.
@@ -87,7 +88,13 @@ type apiCert struct {
 	NotAfter int64  `json:"notAfter"`      // Timestamp
 }
 
-func (s *SSLLabsScanner) Scan(target string) (*SSLResult, error) {
+func (s *SSLLabsScanner) Scan(target string, fresh bool) (*SSLResult, error) {
+	// A rescan must not be answered from the cache, or it would just repeat
+	// the old assessment.
+	if fresh {
+		return s.startAndPoll(target)
+	}
+
 	// 1. Check for existing scan first (startNew=false)
 	// This helps avoid 529 errors by not triggering new scans unnecessarily.
 	hostData, err := s.analyze(target, false)
@@ -129,14 +136,27 @@ func (s *SSLLabsScanner) Scan(target string) (*SSLResult, error) {
 
 	// 2. Start new scan if needed
 	if shouldStartNew {
-		hostData, err = s.analyze(target, true)
-		if err != nil {
-			if strings.Contains(err.Error(), "529") {
-				time.Sleep(60 * time.Second)
-			}
-			return nil, err
-		}
+		return s.startAndPoll(target)
 	}
+	return s.poll(target, hostData)
+}
+
+// startAndPoll asks SSL Labs for a new assessment (startNew=on) and waits for
+// it to finish.
+func (s *SSLLabsScanner) startAndPoll(target string) (*SSLResult, error) {
+	hostData, err := s.analyze(target, true)
+	if err != nil {
+		if strings.Contains(err.Error(), "529") {
+			time.Sleep(60 * time.Second)
+		}
+		return nil, err
+	}
+	return s.poll(target, hostData)
+}
+
+// poll waits until the assessment is READY or ERROR and builds the result.
+func (s *SSLLabsScanner) poll(target string, hostData *apiHost) (*SSLResult, error) {
+	var err error
 
 	// 3. Poll until READY or ERROR
 	ticker := time.NewTicker(30 * time.Second) // Slower polling to be polite
