@@ -1,0 +1,29 @@
+{{template "views/partials/header" .}}
+
+<h1>Token created</h1>
+
+<p style="margin-bottom: 16px;">Copy the token for <strong>{{.TokenName}}</strong> now. It is shown only once and cannot be recovered. If you lose it, revoke it and create a new one.</p>
+
+<div style="display: flex; gap: 8px; align-items: center; margin-bottom: 24px;">
+  <input type="text" id="api-token" value="{{.Token}}" readonly class="mono" style="width: 100%; max-width: 520px;" onclick="this.select();">
+  <button type="button" id="copy-token">Copy</button>
+</div>
+
+<div id="token-snippets"></div>
+
+<a href="/account" class="btn">Done</a>
+
+<script>
+document.getElementById('copy-token').addEventListener('click', function () {
+  var input = document.getElementById('api-token');
+  input.select();
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(input.value);
+  } else {
+    // The clipboard API needs a secure context, so fall back on plain HTTP.
+    document.execCommand('copy');
+  }
+});
+</script>
+
+{{template "views/partials/footer" .}}

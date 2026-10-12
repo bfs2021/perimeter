@@ -117,10 +117,15 @@ func (s *Server) handleAccount(c *fiber.Ctx) error {
 		}
 		recoveryLeft = n
 	}
+	tokens, err := s.auth.ListAPITokens(c.Context(), u.ID)
+	if err != nil {
+		return err
+	}
 
 	return c.Render("views/account", s.templateData(c, fiber.Map{
 		"SSOOnly":      u.PasswordHash == nil,
 		"RecoveryLeft": recoveryLeft,
+		"APITokens":    tokens,
 	}), "views/layouts/main")
 }
 

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"perimeter/ent/apitoken"
 	"perimeter/ent/invite"
 	"perimeter/ent/loginchallenge"
 	"perimeter/ent/recoverycode"
@@ -274,6 +275,21 @@ func (_c *UserCreate) AddLoginChallenges(v ...*LoginChallenge) *UserCreate {
 	return _c.AddLoginChallengeIDs(ids...)
 }
 
+// AddAPITokenIDs adds the "api_tokens" edge to the APIToken entity by IDs.
+func (_c *UserCreate) AddAPITokenIDs(ids ...int) *UserCreate {
+	_c.mutation.AddAPITokenIDs(ids...)
+	return _c
+}
+
+// AddAPITokens adds the "api_tokens" edges to the APIToken entity.
+func (_c *UserCreate) AddAPITokens(v ...*APIToken) *UserCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddAPITokenIDs(ids...)
+}
+
 // Mutation returns the UserMutation object of the builder.
 func (_c *UserCreate) Mutation() *UserMutation {
 	return _c.mutation
@@ -533,6 +549,22 @@ func (_c *UserCreate) createSpec() (*User, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(loginchallenge.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.APITokensIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.APITokensTable,
+			Columns: []string{user.APITokensColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(apitoken.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

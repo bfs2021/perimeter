@@ -3,6 +3,7 @@
 package runtime
 
 import (
+	"perimeter/ent/apitoken"
 	"perimeter/ent/cspscan"
 	"perimeter/ent/datamigration"
 	"perimeter/ent/importerconfig"
@@ -26,6 +27,47 @@ import (
 // (default values, validators, hooks and policies) and stitches it
 // to their package variables.
 func init() {
+	apitokenMixin := schema.APIToken{}.Mixin()
+	apitokenMixinFields0 := apitokenMixin[0].Fields()
+	_ = apitokenMixinFields0
+	apitokenFields := schema.APIToken{}.Fields()
+	_ = apitokenFields
+	// apitokenDescCreateTime is the schema descriptor for create_time field.
+	apitokenDescCreateTime := apitokenMixinFields0[0].Descriptor()
+	// apitoken.DefaultCreateTime holds the default value on creation for the create_time field.
+	apitoken.DefaultCreateTime = apitokenDescCreateTime.Default.(func() time.Time)
+	// apitokenDescUpdateTime is the schema descriptor for update_time field.
+	apitokenDescUpdateTime := apitokenMixinFields0[1].Descriptor()
+	// apitoken.DefaultUpdateTime holds the default value on creation for the update_time field.
+	apitoken.DefaultUpdateTime = apitokenDescUpdateTime.Default.(func() time.Time)
+	// apitoken.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	apitoken.UpdateDefaultUpdateTime = apitokenDescUpdateTime.UpdateDefault.(func() time.Time)
+	// apitokenDescName is the schema descriptor for name field.
+	apitokenDescName := apitokenFields[0].Descriptor()
+	// apitoken.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	apitoken.NameValidator = func() func(string) error {
+		validators := apitokenDescName.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(name string) error {
+			for _, fn := range fns {
+				if err := fn(name); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// apitokenDescTokenHash is the schema descriptor for token_hash field.
+	apitokenDescTokenHash := apitokenFields[2].Descriptor()
+	// apitoken.TokenHashValidator is a validator for the "token_hash" field. It is called by the builders before save.
+	apitoken.TokenHashValidator = apitokenDescTokenHash.Validators[0].(func(string) error)
+	// apitokenDescPrefix is the schema descriptor for prefix field.
+	apitokenDescPrefix := apitokenFields[3].Descriptor()
+	// apitoken.PrefixValidator is a validator for the "prefix" field. It is called by the builders before save.
+	apitoken.PrefixValidator = apitokenDescPrefix.Validators[0].(func(string) error)
 	cspscanFields := schema.CSPScan{}.Fields()
 	_ = cspscanFields
 	// cspscanDescCheckCount is the schema descriptor for check_count field.

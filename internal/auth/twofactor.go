@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"perimeter/ent"
+	"perimeter/ent/apitoken"
 	"perimeter/ent/loginchallenge"
 	"perimeter/ent/recoverycode"
 	"perimeter/ent/session"
@@ -215,6 +216,16 @@ func (a *Auth) VerifySecondFactor(ctx context.Context, u *ent.User, code string)
 	return nil
 }
 
+// VerifyAccountSecondFactor checks a TOTP or recovery code for an action on the
+// account page, behind the same lockout as the login and recovery forms.
+func (a *Auth) VerifyAccountSecondFactor(ctx context.Context, u *ent.User, code string) error {
+	cur, err := a.client.User.Get(ctx, u.ID)
+	if err != nil {
+		return err
+	}
+	return a.verifyWithLockout(ctx, cur, code)
+}
+
 // DisableTOTP turns two-factor off after checking the password and a second factor.
 func (a *Auth) DisableTOTP(ctx context.Context, u *ent.User, password, code string) error {
 	cur, err := a.client.User.Get(ctx, u.ID)
@@ -283,6 +294,13 @@ func (a *Auth) ResetTOTP(ctx context.Context, userID int) error {
 	}
 	if _, err := tx.Session.Delete().
 		Where(session.HasUserWith(user.IDEQ(userID))).
+		Exec(ctx); err != nil {
+		return rollback(tx, err)
+	}
+	// Tokens are kept as rows so they still show as revoked in the lists.
+	if err := tx.APIToken.Update().
+		Where(apitoken.HasUserWith(user.IDEQ(userID)), apitoken.RevokedAtIsNil()).
+		SetRevokedAt(time.Now()).
 		Exec(ctx); err != nil {
 		return rollback(tx, err)
 	}

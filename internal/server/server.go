@@ -52,6 +52,8 @@ type Server struct {
 	certExpiryWindow time.Duration
 	// dashboardPageSize is how many targets the dashboard shows per page.
 	dashboardPageSize int
+	// apiLimiter throttles /api/v1 per token. SetAPIRateLimit replaces it.
+	apiLimiter fiber.Handler
 }
 
 func New(s storage.Storage, a *auth.Auth, client *ent.Client, registry *importer.Registry, notifierReg *notifier.Registry, viewsFS fs.FS, certExpiryWindow time.Duration, dashboardPageSize int) *Server {
@@ -70,6 +72,7 @@ func New(s storage.Storage, a *auth.Auth, client *ent.Client, registry *importer
 		certExpiryWindow:  certExpiryWindow,
 		dashboardPageSize: dashboardPageSize,
 	}
+	srv.SetAPIRateLimit(defaultAPIRateLimit)
 
 	app := fiber.New(fiber.Config{
 		Views:        engine,
@@ -113,6 +116,7 @@ func newViewEngine(viewsFS fs.FS) *html.Engine {
 	engine.AddFunc("eventLabel", notifierEventLabel)
 	engine.AddFunc("formValue", formValue)
 	engine.AddFunc("formChecked", formChecked)
+	engine.AddFunc("tokenStatus", tokenStatus)
 	return engine
 }
 
@@ -127,6 +131,10 @@ func (s *Server) setupRoutes() {
 	// Before every route, public ones included: login and setup forms are
 	// CSRF targets too.
 	s.app.Use(crossOriginProtection())
+
+	// Bearer-token API. Mounted before the cookie group below, which would
+	// otherwise catch these paths first.
+	s.setupAPIRoutes()
 
 	// Public routes
 	s.app.Get("/setup", s.handleSetupPage)
@@ -172,6 +180,8 @@ func (s *Server) setupRoutes() {
 	authed.Post("/account/2fa/confirm", s.handleAccountConfirm)
 	authed.Post("/account/2fa/recovery", s.handleAccountRecovery)
 	authed.Post("/account/2fa/disable", s.handleAccountDisable)
+	authed.Post("/account/tokens", s.handleCreateAPIToken)
+	authed.Post("/account/tokens/:id/revoke", s.handleRevokeAPIToken)
 
 	// Admin routes
 	authed.Get("/settings", adminOnly, s.handleSettings)
@@ -189,6 +199,7 @@ func (s *Server) setupRoutes() {
 	authed.Post("/notifiers/:id/toggle", adminOnly, s.handleToggleNotifier)
 	authed.Post("/tags", adminOnly, s.handleCreateTag)
 	authed.Post("/tags/:id/delete", adminOnly, s.handleDeleteTag)
+	authed.Post("/settings/tokens/:id/revoke", adminOnly, s.handleAdminRevokeAPIToken)
 
 	// Catch-all: a path no route claimed renders the 404 page instead of
 	// fiber's plain text. Registered last, so only unmatched paths reach it.
@@ -229,6 +240,10 @@ func (s *Server) errorHandler(c *fiber.Ctx, err error) error {
 		// Internal errors are logged, not shown: they can carry SQL or paths.
 		log.Printf("%s %s: %v", c.Method(), c.Path(), err)
 		msg = "An unexpected error occurred. Check the server log for details."
+	}
+	// The /api/ routes answer in JSON, whatever went wrong.
+	if strings.HasPrefix(c.Path(), "/api/") {
+		return apiError(c, code, apiErrorCode(code), msg)
 	}
 	title := "Something went wrong"
 	switch code {
@@ -1085,6 +1100,7 @@ func (s *Server) handleImportSubmit(c *fiber.Ctx) error {
 
 func (s *Server) settingsData(c *fiber.Ctx, extra fiber.Map) fiber.Map {
 	users, _ := s.client.User.Query().All(c.Context())
+	apiTokens, _ := s.auth.ListAllAPITokens(c.Context())
 	importers, _ := s.client.ImporterConfig.Query().All(c.Context())
 	notifiers, _ := s.client.NotifierConfig.Query().All(c.Context())
 	tags, _ := s.client.Tag.Query().All(c.Context())
@@ -1094,6 +1110,7 @@ func (s *Server) settingsData(c *fiber.Ctx, extra fiber.Map) fiber.Map {
 	data := s.templateData(c, fiber.Map{
 		"Title":              "Settings",
 		"Users":              users,
+		"APITokens":          apiTokens,
 		"Importers":          importers,
 		"Notifiers":          notifiers,
 		"Tags":               tags,
