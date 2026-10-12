@@ -133,6 +133,22 @@ func TestImportTargetsReportsAndAudits(t *testing.T) {
 	}
 }
 
+func TestImportTargetsNoAuditWhenNothingChanged(t *testing.T) {
+	f := newFixture(t)
+	admin := f.writeUser("admin@example.com", user.RoleAdmin)
+	f.target("existing.example.com")
+	actor := service.Actor{User: admin, Source: service.SourceAPI}
+
+	res, err := f.svc.ImportTargets(f.ctx, actor, []string{"existing.example.com", "not valid!"})
+	f.must(err)
+	if !slices.Equal(res.Existing, []string{"existing.example.com"}) || !slices.Equal(res.Invalid, []string{"not valid!"}) {
+		t.Errorf("result = %+v", res)
+	}
+	if n := len(f.audits()); n != 0 {
+		t.Errorf("%d audit rows, want 0", n)
+	}
+}
+
 func TestImportTargetsLimit(t *testing.T) {
 	f := newFixture(t)
 	admin := f.writeUser("admin@example.com", user.RoleAdmin)

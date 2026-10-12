@@ -459,8 +459,9 @@ func TestAPIIdempotencyKeysAreScopedToToken(t *testing.T) {
 	if !strings.Contains(resp.Body, `"existing":["scoped.example.com"]`) {
 		t.Errorf("second token ran as a new request: %s", resp.Body)
 	}
-	if n := auditCount(t, client, "target.import"); n != 2 {
-		t.Errorf("%d import audit rows, want 2", n)
+	// Only the first import changed something; the second added nothing.
+	if n := auditCount(t, client, "target.import"); n != 1 {
+		t.Errorf("%d import audit rows, want 1", n)
 	}
 }
 
@@ -511,8 +512,10 @@ func TestAPIIdempotencyOnlyCoversWrites(t *testing.T) {
 			t.Errorf("keyless write %d was replayed", i)
 		}
 	}
-	if n := auditCount(t, client, "target.import"); n != 3 {
-		t.Errorf("%d import audit rows, want 3", n)
+	// Only the first write changed something; the two keyless repeats added
+	// nothing, so they audit nothing.
+	if n := auditCount(t, client, "target.import"); n != 1 {
+		t.Errorf("%d import audit rows, want 1", n)
 	}
 }
 
@@ -598,6 +601,20 @@ func TestIdempotencyStoreKeepsBodiesUnderByteBudget(t *testing.T) {
 	}
 	if s.bytes != 6 {
 		t.Errorf("bytes = %d, want 6", s.bytes)
+	}
+}
+
+func TestIdempotencyStoreCompleteIgnoresEvictedEntry(t *testing.T) {
+	s := newIdempotencyStore(time.Hour, 1)
+	ea, _ := s.claim(idemKey{token: 1, key: "a"}, "fp")
+	// "b" evicts "a" while its request is still running.
+	s.claim(idemKey{token: 1, key: "b"}, "fp")
+	s.complete(ea, http.StatusOK, "", []byte("123456"))
+	if s.bytes != 0 {
+		t.Errorf("bytes = %d, want 0", s.bytes)
+	}
+	if _, ok := s.entries[idemKey{token: 1, key: "a"}]; ok {
+		t.Error("evicted entry kept in the store")
 	}
 }
 

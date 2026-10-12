@@ -11,6 +11,7 @@ import (
 	"perimeter/internal/auth"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/utils"
 )
 
 // Idempotency-Key handling for the write routes of /api/v1. A client that
@@ -84,7 +85,10 @@ func (s *idempotencyStore) middleware() fiber.Handler {
 		default:
 			return c.Next()
 		}
-		key := c.Get(idempotencyHeader)
+		// Copy the header: Fiber v2 runs without Immutable, so c.Get returns a
+		// string into a buffer fasthttp reuses after the request, and the key
+		// stored in the map would be corrupted.
+		key := utils.CopyString(c.Get(idempotencyHeader))
 		tok := auth.GetAPIToken(c)
 		if key == "" || tok == nil {
 			// A nil token is refused with 401 by RequireAPIWrite.
@@ -161,6 +165,12 @@ func (s *idempotencyStore) claim(k idemKey, fingerprint string) (*idemEntry, str
 func (s *idempotencyStore) complete(e *idemEntry, status int, contentType string, body []byte) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	// Same check as release: the entry may have been evicted and its key
+	// claimed again while the request ran, and its body size must not leak
+	// into s.bytes without an entry to subtract it.
+	if s.entries[e.key] != e {
+		return
+	}
 	e.status = status
 	e.contentType = contentType
 	e.body = body

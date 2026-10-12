@@ -89,8 +89,12 @@ func (s *Service) ImportTargets(ctx context.Context, a Actor, inputs []string) (
 		return nil, err
 	}
 
-	object, detail := ImportAudit(res)
-	s.Audit(ctx, a, "target.import", object, detail)
+	// Nothing was added or restored, so nothing changed and there is nothing
+	// to audit, like RequestRescan.
+	if len(res.Added) > 0 || len(res.Restored) > 0 {
+		object, detail := ImportAudit(res)
+		s.Audit(ctx, a, "target.import", object, detail)
+	}
 	return &ImportResult{
 		Added:    orEmpty(res.Added),
 		Existing: orEmpty(res.Existing),
