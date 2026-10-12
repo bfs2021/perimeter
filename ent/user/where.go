@@ -90,6 +90,31 @@ func LastLoginAt(v time.Time) predicate.User {
 	return predicate.User(sql.FieldEQ(FieldLastLoginAt, v))
 }
 
+// TotpSecret applies equality check predicate on the "totp_secret" field. It's identical to TotpSecretEQ.
+func TotpSecret(v string) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldTotpSecret, v))
+}
+
+// TotpEnabled applies equality check predicate on the "totp_enabled" field. It's identical to TotpEnabledEQ.
+func TotpEnabled(v bool) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldTotpEnabled, v))
+}
+
+// TotpLastStep applies equality check predicate on the "totp_last_step" field. It's identical to TotpLastStepEQ.
+func TotpLastStep(v int64) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldTotpLastStep, v))
+}
+
+// TotpFailures applies equality check predicate on the "totp_failures" field. It's identical to TotpFailuresEQ.
+func TotpFailures(v int) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldTotpFailures, v))
+}
+
+// TotpLockedUntil applies equality check predicate on the "totp_locked_until" field. It's identical to TotpLockedUntilEQ.
+func TotpLockedUntil(v time.Time) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldTotpLockedUntil, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.User {
 	return predicate.User(sql.FieldEQ(FieldCreateTime, v))
@@ -455,6 +480,221 @@ func LastLoginAtNotNil() predicate.User {
 	return predicate.User(sql.FieldNotNull(FieldLastLoginAt))
 }
 
+// TotpSecretEQ applies the EQ predicate on the "totp_secret" field.
+func TotpSecretEQ(v string) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldTotpSecret, v))
+}
+
+// TotpSecretNEQ applies the NEQ predicate on the "totp_secret" field.
+func TotpSecretNEQ(v string) predicate.User {
+	return predicate.User(sql.FieldNEQ(FieldTotpSecret, v))
+}
+
+// TotpSecretIn applies the In predicate on the "totp_secret" field.
+func TotpSecretIn(vs ...string) predicate.User {
+	return predicate.User(sql.FieldIn(FieldTotpSecret, vs...))
+}
+
+// TotpSecretNotIn applies the NotIn predicate on the "totp_secret" field.
+func TotpSecretNotIn(vs ...string) predicate.User {
+	return predicate.User(sql.FieldNotIn(FieldTotpSecret, vs...))
+}
+
+// TotpSecretGT applies the GT predicate on the "totp_secret" field.
+func TotpSecretGT(v string) predicate.User {
+	return predicate.User(sql.FieldGT(FieldTotpSecret, v))
+}
+
+// TotpSecretGTE applies the GTE predicate on the "totp_secret" field.
+func TotpSecretGTE(v string) predicate.User {
+	return predicate.User(sql.FieldGTE(FieldTotpSecret, v))
+}
+
+// TotpSecretLT applies the LT predicate on the "totp_secret" field.
+func TotpSecretLT(v string) predicate.User {
+	return predicate.User(sql.FieldLT(FieldTotpSecret, v))
+}
+
+// TotpSecretLTE applies the LTE predicate on the "totp_secret" field.
+func TotpSecretLTE(v string) predicate.User {
+	return predicate.User(sql.FieldLTE(FieldTotpSecret, v))
+}
+
+// TotpSecretContains applies the Contains predicate on the "totp_secret" field.
+func TotpSecretContains(v string) predicate.User {
+	return predicate.User(sql.FieldContains(FieldTotpSecret, v))
+}
+
+// TotpSecretHasPrefix applies the HasPrefix predicate on the "totp_secret" field.
+func TotpSecretHasPrefix(v string) predicate.User {
+	return predicate.User(sql.FieldHasPrefix(FieldTotpSecret, v))
+}
+
+// TotpSecretHasSuffix applies the HasSuffix predicate on the "totp_secret" field.
+func TotpSecretHasSuffix(v string) predicate.User {
+	return predicate.User(sql.FieldHasSuffix(FieldTotpSecret, v))
+}
+
+// TotpSecretIsNil applies the IsNil predicate on the "totp_secret" field.
+func TotpSecretIsNil() predicate.User {
+	return predicate.User(sql.FieldIsNull(FieldTotpSecret))
+}
+
+// TotpSecretNotNil applies the NotNil predicate on the "totp_secret" field.
+func TotpSecretNotNil() predicate.User {
+	return predicate.User(sql.FieldNotNull(FieldTotpSecret))
+}
+
+// TotpSecretEqualFold applies the EqualFold predicate on the "totp_secret" field.
+func TotpSecretEqualFold(v string) predicate.User {
+	return predicate.User(sql.FieldEqualFold(FieldTotpSecret, v))
+}
+
+// TotpSecretContainsFold applies the ContainsFold predicate on the "totp_secret" field.
+func TotpSecretContainsFold(v string) predicate.User {
+	return predicate.User(sql.FieldContainsFold(FieldTotpSecret, v))
+}
+
+// TotpEnabledEQ applies the EQ predicate on the "totp_enabled" field.
+func TotpEnabledEQ(v bool) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldTotpEnabled, v))
+}
+
+// TotpEnabledNEQ applies the NEQ predicate on the "totp_enabled" field.
+func TotpEnabledNEQ(v bool) predicate.User {
+	return predicate.User(sql.FieldNEQ(FieldTotpEnabled, v))
+}
+
+// TotpLastStepEQ applies the EQ predicate on the "totp_last_step" field.
+func TotpLastStepEQ(v int64) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldTotpLastStep, v))
+}
+
+// TotpLastStepNEQ applies the NEQ predicate on the "totp_last_step" field.
+func TotpLastStepNEQ(v int64) predicate.User {
+	return predicate.User(sql.FieldNEQ(FieldTotpLastStep, v))
+}
+
+// TotpLastStepIn applies the In predicate on the "totp_last_step" field.
+func TotpLastStepIn(vs ...int64) predicate.User {
+	return predicate.User(sql.FieldIn(FieldTotpLastStep, vs...))
+}
+
+// TotpLastStepNotIn applies the NotIn predicate on the "totp_last_step" field.
+func TotpLastStepNotIn(vs ...int64) predicate.User {
+	return predicate.User(sql.FieldNotIn(FieldTotpLastStep, vs...))
+}
+
+// TotpLastStepGT applies the GT predicate on the "totp_last_step" field.
+func TotpLastStepGT(v int64) predicate.User {
+	return predicate.User(sql.FieldGT(FieldTotpLastStep, v))
+}
+
+// TotpLastStepGTE applies the GTE predicate on the "totp_last_step" field.
+func TotpLastStepGTE(v int64) predicate.User {
+	return predicate.User(sql.FieldGTE(FieldTotpLastStep, v))
+}
+
+// TotpLastStepLT applies the LT predicate on the "totp_last_step" field.
+func TotpLastStepLT(v int64) predicate.User {
+	return predicate.User(sql.FieldLT(FieldTotpLastStep, v))
+}
+
+// TotpLastStepLTE applies the LTE predicate on the "totp_last_step" field.
+func TotpLastStepLTE(v int64) predicate.User {
+	return predicate.User(sql.FieldLTE(FieldTotpLastStep, v))
+}
+
+// TotpFailuresEQ applies the EQ predicate on the "totp_failures" field.
+func TotpFailuresEQ(v int) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldTotpFailures, v))
+}
+
+// TotpFailuresNEQ applies the NEQ predicate on the "totp_failures" field.
+func TotpFailuresNEQ(v int) predicate.User {
+	return predicate.User(sql.FieldNEQ(FieldTotpFailures, v))
+}
+
+// TotpFailuresIn applies the In predicate on the "totp_failures" field.
+func TotpFailuresIn(vs ...int) predicate.User {
+	return predicate.User(sql.FieldIn(FieldTotpFailures, vs...))
+}
+
+// TotpFailuresNotIn applies the NotIn predicate on the "totp_failures" field.
+func TotpFailuresNotIn(vs ...int) predicate.User {
+	return predicate.User(sql.FieldNotIn(FieldTotpFailures, vs...))
+}
+
+// TotpFailuresGT applies the GT predicate on the "totp_failures" field.
+func TotpFailuresGT(v int) predicate.User {
+	return predicate.User(sql.FieldGT(FieldTotpFailures, v))
+}
+
+// TotpFailuresGTE applies the GTE predicate on the "totp_failures" field.
+func TotpFailuresGTE(v int) predicate.User {
+	return predicate.User(sql.FieldGTE(FieldTotpFailures, v))
+}
+
+// TotpFailuresLT applies the LT predicate on the "totp_failures" field.
+func TotpFailuresLT(v int) predicate.User {
+	return predicate.User(sql.FieldLT(FieldTotpFailures, v))
+}
+
+// TotpFailuresLTE applies the LTE predicate on the "totp_failures" field.
+func TotpFailuresLTE(v int) predicate.User {
+	return predicate.User(sql.FieldLTE(FieldTotpFailures, v))
+}
+
+// TotpLockedUntilEQ applies the EQ predicate on the "totp_locked_until" field.
+func TotpLockedUntilEQ(v time.Time) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldTotpLockedUntil, v))
+}
+
+// TotpLockedUntilNEQ applies the NEQ predicate on the "totp_locked_until" field.
+func TotpLockedUntilNEQ(v time.Time) predicate.User {
+	return predicate.User(sql.FieldNEQ(FieldTotpLockedUntil, v))
+}
+
+// TotpLockedUntilIn applies the In predicate on the "totp_locked_until" field.
+func TotpLockedUntilIn(vs ...time.Time) predicate.User {
+	return predicate.User(sql.FieldIn(FieldTotpLockedUntil, vs...))
+}
+
+// TotpLockedUntilNotIn applies the NotIn predicate on the "totp_locked_until" field.
+func TotpLockedUntilNotIn(vs ...time.Time) predicate.User {
+	return predicate.User(sql.FieldNotIn(FieldTotpLockedUntil, vs...))
+}
+
+// TotpLockedUntilGT applies the GT predicate on the "totp_locked_until" field.
+func TotpLockedUntilGT(v time.Time) predicate.User {
+	return predicate.User(sql.FieldGT(FieldTotpLockedUntil, v))
+}
+
+// TotpLockedUntilGTE applies the GTE predicate on the "totp_locked_until" field.
+func TotpLockedUntilGTE(v time.Time) predicate.User {
+	return predicate.User(sql.FieldGTE(FieldTotpLockedUntil, v))
+}
+
+// TotpLockedUntilLT applies the LT predicate on the "totp_locked_until" field.
+func TotpLockedUntilLT(v time.Time) predicate.User {
+	return predicate.User(sql.FieldLT(FieldTotpLockedUntil, v))
+}
+
+// TotpLockedUntilLTE applies the LTE predicate on the "totp_locked_until" field.
+func TotpLockedUntilLTE(v time.Time) predicate.User {
+	return predicate.User(sql.FieldLTE(FieldTotpLockedUntil, v))
+}
+
+// TotpLockedUntilIsNil applies the IsNil predicate on the "totp_locked_until" field.
+func TotpLockedUntilIsNil() predicate.User {
+	return predicate.User(sql.FieldIsNull(FieldTotpLockedUntil))
+}
+
+// TotpLockedUntilNotNil applies the NotNil predicate on the "totp_locked_until" field.
+func TotpLockedUntilNotNil() predicate.User {
+	return predicate.User(sql.FieldNotNull(FieldTotpLockedUntil))
+}
+
 // HasTargets applies the HasEdge predicate on the "targets" edge.
 func HasTargets() predicate.User {
 	return predicate.User(func(s *sql.Selector) {
@@ -516,6 +756,52 @@ func HasInvites() predicate.User {
 func HasInvitesWith(preds ...predicate.Invite) predicate.User {
 	return predicate.User(func(s *sql.Selector) {
 		step := newInvitesStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasRecoveryCodes applies the HasEdge predicate on the "recovery_codes" edge.
+func HasRecoveryCodes() predicate.User {
+	return predicate.User(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, RecoveryCodesTable, RecoveryCodesColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasRecoveryCodesWith applies the HasEdge predicate on the "recovery_codes" edge with a given conditions (other predicates).
+func HasRecoveryCodesWith(preds ...predicate.RecoveryCode) predicate.User {
+	return predicate.User(func(s *sql.Selector) {
+		step := newRecoveryCodesStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasLoginChallenges applies the HasEdge predicate on the "login_challenges" edge.
+func HasLoginChallenges() predicate.User {
+	return predicate.User(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, LoginChallengesTable, LoginChallengesColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasLoginChallengesWith applies the HasEdge predicate on the "login_challenges" edge with a given conditions (other predicates).
+func HasLoginChallengesWith(preds ...predicate.LoginChallenge) predicate.User {
+	return predicate.User(func(s *sql.Selector) {
+		step := newLoginChallengesStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

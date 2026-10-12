@@ -31,12 +31,26 @@ const (
 	FieldRole = "role"
 	// FieldLastLoginAt holds the string denoting the last_login_at field in the database.
 	FieldLastLoginAt = "last_login_at"
+	// FieldTotpSecret holds the string denoting the totp_secret field in the database.
+	FieldTotpSecret = "totp_secret"
+	// FieldTotpEnabled holds the string denoting the totp_enabled field in the database.
+	FieldTotpEnabled = "totp_enabled"
+	// FieldTotpLastStep holds the string denoting the totp_last_step field in the database.
+	FieldTotpLastStep = "totp_last_step"
+	// FieldTotpFailures holds the string denoting the totp_failures field in the database.
+	FieldTotpFailures = "totp_failures"
+	// FieldTotpLockedUntil holds the string denoting the totp_locked_until field in the database.
+	FieldTotpLockedUntil = "totp_locked_until"
 	// EdgeTargets holds the string denoting the targets edge name in mutations.
 	EdgeTargets = "targets"
 	// EdgeSessions holds the string denoting the sessions edge name in mutations.
 	EdgeSessions = "sessions"
 	// EdgeInvites holds the string denoting the invites edge name in mutations.
 	EdgeInvites = "invites"
+	// EdgeRecoveryCodes holds the string denoting the recovery_codes edge name in mutations.
+	EdgeRecoveryCodes = "recovery_codes"
+	// EdgeLoginChallenges holds the string denoting the login_challenges edge name in mutations.
+	EdgeLoginChallenges = "login_challenges"
 	// Table holds the table name of the user in the database.
 	Table = "users"
 	// TargetsTable is the table that holds the targets relation/edge.
@@ -60,6 +74,20 @@ const (
 	InvitesInverseTable = "invites"
 	// InvitesColumn is the table column denoting the invites relation/edge.
 	InvitesColumn = "user_invites"
+	// RecoveryCodesTable is the table that holds the recovery_codes relation/edge.
+	RecoveryCodesTable = "recovery_codes"
+	// RecoveryCodesInverseTable is the table name for the RecoveryCode entity.
+	// It exists in this package in order to avoid circular dependency with the "recoverycode" package.
+	RecoveryCodesInverseTable = "recovery_codes"
+	// RecoveryCodesColumn is the table column denoting the recovery_codes relation/edge.
+	RecoveryCodesColumn = "user_recovery_codes"
+	// LoginChallengesTable is the table that holds the login_challenges relation/edge.
+	LoginChallengesTable = "login_challenges"
+	// LoginChallengesInverseTable is the table name for the LoginChallenge entity.
+	// It exists in this package in order to avoid circular dependency with the "loginchallenge" package.
+	LoginChallengesInverseTable = "login_challenges"
+	// LoginChallengesColumn is the table column denoting the login_challenges relation/edge.
+	LoginChallengesColumn = "user_login_challenges"
 )
 
 // Columns holds all SQL columns for user fields.
@@ -73,6 +101,11 @@ var Columns = []string{
 	FieldConfirmed,
 	FieldRole,
 	FieldLastLoginAt,
+	FieldTotpSecret,
+	FieldTotpEnabled,
+	FieldTotpLastStep,
+	FieldTotpFailures,
+	FieldTotpLockedUntil,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -98,6 +131,12 @@ var (
 	DefaultName string
 	// DefaultConfirmed holds the default value on creation for the "confirmed" field.
 	DefaultConfirmed bool
+	// DefaultTotpEnabled holds the default value on creation for the "totp_enabled" field.
+	DefaultTotpEnabled bool
+	// DefaultTotpLastStep holds the default value on creation for the "totp_last_step" field.
+	DefaultTotpLastStep int64
+	// DefaultTotpFailures holds the default value on creation for the "totp_failures" field.
+	DefaultTotpFailures int
 )
 
 // Role defines the type for the "role" enum field.
@@ -175,6 +214,31 @@ func ByLastLoginAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldLastLoginAt, opts...).ToFunc()
 }
 
+// ByTotpSecret orders the results by the totp_secret field.
+func ByTotpSecret(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTotpSecret, opts...).ToFunc()
+}
+
+// ByTotpEnabled orders the results by the totp_enabled field.
+func ByTotpEnabled(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTotpEnabled, opts...).ToFunc()
+}
+
+// ByTotpLastStep orders the results by the totp_last_step field.
+func ByTotpLastStep(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTotpLastStep, opts...).ToFunc()
+}
+
+// ByTotpFailures orders the results by the totp_failures field.
+func ByTotpFailures(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTotpFailures, opts...).ToFunc()
+}
+
+// ByTotpLockedUntil orders the results by the totp_locked_until field.
+func ByTotpLockedUntil(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTotpLockedUntil, opts...).ToFunc()
+}
+
 // ByTargetsCount orders the results by targets count.
 func ByTargetsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -216,6 +280,34 @@ func ByInvites(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newInvitesStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
+
+// ByRecoveryCodesCount orders the results by recovery_codes count.
+func ByRecoveryCodesCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newRecoveryCodesStep(), opts...)
+	}
+}
+
+// ByRecoveryCodes orders the results by recovery_codes terms.
+func ByRecoveryCodes(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newRecoveryCodesStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByLoginChallengesCount orders the results by login_challenges count.
+func ByLoginChallengesCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newLoginChallengesStep(), opts...)
+	}
+}
+
+// ByLoginChallenges orders the results by login_challenges terms.
+func ByLoginChallenges(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newLoginChallengesStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newTargetsStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -235,5 +327,19 @@ func newInvitesStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(InvitesInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, InvitesTable, InvitesColumn),
+	)
+}
+func newRecoveryCodesStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(RecoveryCodesInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, RecoveryCodesTable, RecoveryCodesColumn),
+	)
+}
+func newLoginChallengesStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(LoginChallengesInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, LoginChallengesTable, LoginChallengesColumn),
 	)
 }

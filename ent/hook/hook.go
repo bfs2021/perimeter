@@ -80,6 +80,18 @@ func (f JobFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) 
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.JobMutation", m)
 }
 
+// The LoginChallengeFunc type is an adapter to allow the use of ordinary
+// function as LoginChallenge mutator.
+type LoginChallengeFunc func(context.Context, *ent.LoginChallengeMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f LoginChallengeFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.LoginChallengeMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.LoginChallengeMutation", m)
+}
+
 // The NotifierConfigFunc type is an adapter to allow the use of ordinary
 // function as NotifierConfig mutator.
 type NotifierConfigFunc func(context.Context, *ent.NotifierConfigMutation) (ent.Value, error)
@@ -114,6 +126,18 @@ func (f PortScanFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, er
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PortScanMutation", m)
+}
+
+// The RecoveryCodeFunc type is an adapter to allow the use of ordinary
+// function as RecoveryCode mutator.
+type RecoveryCodeFunc func(context.Context, *ent.RecoveryCodeMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f RecoveryCodeFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.RecoveryCodeMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.RecoveryCodeMutation", m)
 }
 
 // The SSLScanFunc type is an adapter to allow the use of ordinary

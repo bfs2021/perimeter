@@ -13,7 +13,7 @@
   </div>
   {{if .User}}
   <div class="nav-right">
-    <span>{{.User.Email}}</span>
+    <a href="/account" style="margin-right: 0;">{{.User.Email}}</a>
     <form method="POST" action="/logout" style="display:inline;">
       <button type="submit">Logout</button>
     </form>

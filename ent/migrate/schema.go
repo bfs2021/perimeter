@@ -124,6 +124,30 @@ var (
 		Columns:    JobsColumns,
 		PrimaryKey: []*schema.Column{JobsColumns[0]},
 	}
+	// LoginChallengesColumns holds the columns for the "login_challenges" table.
+	LoginChallengesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "token_hash", Type: field.TypeString, Unique: true},
+		{Name: "expires_at", Type: field.TypeTime},
+		{Name: "attempts", Type: field.TypeInt, Default: 0},
+		{Name: "user_login_challenges", Type: field.TypeInt},
+	}
+	// LoginChallengesTable holds the schema information for the "login_challenges" table.
+	LoginChallengesTable = &schema.Table{
+		Name:       "login_challenges",
+		Columns:    LoginChallengesColumns,
+		PrimaryKey: []*schema.Column{LoginChallengesColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "login_challenges_users_login_challenges",
+				Columns:    []*schema.Column{LoginChallengesColumns[6]},
+				RefColumns: []*schema.Column{UsersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+	}
 	// NotifierConfigsColumns holds the columns for the "notifier_configs" table.
 	NotifierConfigsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -179,6 +203,29 @@ var (
 				Symbol:     "port_scans_ips_scans",
 				Columns:    []*schema.Column{PortScansColumns[5]},
 				RefColumns: []*schema.Column{IpsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+	}
+	// RecoveryCodesColumns holds the columns for the "recovery_codes" table.
+	RecoveryCodesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "code_hash", Type: field.TypeString},
+		{Name: "used_at", Type: field.TypeTime, Nullable: true},
+		{Name: "user_recovery_codes", Type: field.TypeInt},
+	}
+	// RecoveryCodesTable holds the schema information for the "recovery_codes" table.
+	RecoveryCodesTable = &schema.Table{
+		Name:       "recovery_codes",
+		Columns:    RecoveryCodesColumns,
+		PrimaryKey: []*schema.Column{RecoveryCodesColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "recovery_codes_users_recovery_codes",
+				Columns:    []*schema.Column{RecoveryCodesColumns[5]},
+				RefColumns: []*schema.Column{UsersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 		},
@@ -322,6 +369,11 @@ var (
 		{Name: "confirmed", Type: field.TypeBool, Default: false},
 		{Name: "role", Type: field.TypeEnum, Enums: []string{"admin", "member", "viewer"}, Default: "member"},
 		{Name: "last_login_at", Type: field.TypeTime, Nullable: true},
+		{Name: "totp_secret", Type: field.TypeString, Nullable: true},
+		{Name: "totp_enabled", Type: field.TypeBool, Default: false},
+		{Name: "totp_last_step", Type: field.TypeInt64, Default: 0},
+		{Name: "totp_failures", Type: field.TypeInt, Default: 0},
+		{Name: "totp_locked_until", Type: field.TypeTime, Nullable: true},
 	}
 	// UsersTable holds the schema information for the "users" table.
 	UsersTable = &schema.Table{
@@ -387,9 +439,11 @@ var (
 		ImporterConfigsTable,
 		InvitesTable,
 		JobsTable,
+		LoginChallengesTable,
 		NotifierConfigsTable,
 		PortsTable,
 		PortScansTable,
+		RecoveryCodesTable,
 		SslScansTable,
 		SessionsTable,
 		TagsTable,
@@ -403,8 +457,10 @@ var (
 func init() {
 	CspScansTable.ForeignKeys[0].RefTable = TargetsTable
 	InvitesTable.ForeignKeys[0].RefTable = UsersTable
+	LoginChallengesTable.ForeignKeys[0].RefTable = UsersTable
 	PortsTable.ForeignKeys[0].RefTable = PortScansTable
 	PortScansTable.ForeignKeys[0].RefTable = IpsTable
+	RecoveryCodesTable.ForeignKeys[0].RefTable = UsersTable
 	SslScansTable.ForeignKeys[0].RefTable = TargetsTable
 	SessionsTable.ForeignKeys[0].RefTable = UsersTable
 	TargetsTable.ForeignKeys[0].RefTable = UsersTable

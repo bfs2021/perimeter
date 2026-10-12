@@ -12,6 +12,8 @@ import (
 
 	"perimeter/ent"
 	"perimeter/ent/invite"
+	"perimeter/ent/loginchallenge"
+	"perimeter/ent/recoverycode"
 	"perimeter/ent/schema"
 	"perimeter/ent/session"
 	"perimeter/ent/target"
@@ -26,6 +28,11 @@ var (
 	ErrInvalidCredentials = errors.New("invalid email or password")
 	ErrNotAllowed         = errors.New("registration is invite-only")
 	ErrEmailTaken         = errors.New("email already registered")
+	ErrTOTPAlreadyEnabled = errors.New("two-factor authentication is already enabled")
+	ErrInvalidCode        = errors.New("invalid verification code")
+	ErrInvalidChallenge   = errors.New("login challenge is invalid or expired")
+	ErrTooManyAttempts    = errors.New("too many wrong codes on this login challenge")
+	ErrTOTPLocked         = errors.New("two-factor authentication is locked after too many wrong codes")
 )
 
 // Config holds authentication configuration.
@@ -186,12 +193,23 @@ func (a *Auth) Login(ctx context.Context, email, password string) (*ent.User, er
 		return nil, ErrInvalidCredentials
 	}
 
-	now := time.Now()
-	if err := a.client.User.UpdateOne(u).SetLastLoginAt(now).Exec(ctx); err != nil {
+	// Two-factor users are marked as logged in only after the second factor passes (see MarkLogin).
+	if u.TotpEnabled {
+		return u, nil
+	}
+
+	if err := a.MarkLogin(ctx, u); err != nil {
 		log.Printf("auth: failed to update last login: %v", err)
 	}
-	u.LastLoginAt = &now
 	return u, nil
+}
+
+// MarkLogin records the current time as the user's last login.
+func (a *Auth) MarkLogin(ctx context.Context, u *ent.User) error {
+	now := time.Now()
+	err := a.client.User.UpdateOne(u).SetLastLoginAt(now).Exec(ctx)
+	u.LastLoginAt = &now
+	return err
 }
 
 // --- OIDC ---
@@ -401,6 +419,16 @@ func (a *Auth) DeleteUser(ctx context.Context, id int) error {
 	}
 	if _, err := tx.Invite.Delete().
 		Where(invite.HasInvitedByWith(user.IDEQ(id))).
+		Exec(ctx); err != nil {
+		return rollback(tx, err)
+	}
+	if _, err := tx.RecoveryCode.Delete().
+		Where(recoverycode.HasUserWith(user.IDEQ(id))).
+		Exec(ctx); err != nil {
+		return rollback(tx, err)
+	}
+	if _, err := tx.LoginChallenge.Delete().
+		Where(loginchallenge.HasUserWith(user.IDEQ(id))).
 		Exec(ctx); err != nil {
 		return rollback(tx, err)
 	}

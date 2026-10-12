@@ -133,6 +133,8 @@ func (s *Server) setupRoutes() {
 	s.app.Post("/setup", s.handleSetup)
 	s.app.Get("/login", s.handleLoginPage)
 	s.app.Post("/login", s.handleLogin)
+	s.app.Get("/login/2fa", s.handleLogin2FAPage)
+	s.app.Post("/login/2fa", s.handleLogin2FA)
 	s.app.Get("/register/:token", s.handleRegisterPage)
 	s.app.Post("/register", s.handleRegister)
 	s.app.Post("/logout", s.handleLogout)
@@ -163,11 +165,20 @@ func (s *Server) setupRoutes() {
 	authed.Post("/targets/:id/tags", canWrite, s.handleUpdateTargetTags)
 	authed.Get("/targets/:id/export", s.handleExportTarget)
 
+	// Account pages: every role can manage its own two-factor.
+	authed.Get("/account", s.handleAccount)
+	authed.Post("/account/2fa/setup", s.handleAccountSetup)
+	authed.Get("/account/2fa/setup", s.handleAccountSetupPage)
+	authed.Post("/account/2fa/confirm", s.handleAccountConfirm)
+	authed.Post("/account/2fa/recovery", s.handleAccountRecovery)
+	authed.Post("/account/2fa/disable", s.handleAccountDisable)
+
 	// Admin routes
 	authed.Get("/settings", adminOnly, s.handleSettings)
 	authed.Post("/invite", adminOnly, s.handleInvite)
 	authed.Get("/users", adminOnly, s.handleUsers)
 	authed.Post("/users/:id/delete", adminOnly, s.handleDeleteUser)
+	authed.Post("/users/:id/2fa/reset", adminOnly, s.handleResetTOTP)
 	authed.Post("/importers", adminOnly, s.handleCreateImporter)
 	authed.Post("/importers/:id/delete", adminOnly, s.handleDeleteImporter)
 	authed.Post("/importers/:id/toggle", adminOnly, s.handleToggleImporter)
@@ -270,9 +281,9 @@ func (s *Server) handleLoginPage(c *fiber.Ctx) error {
 	if !hasUsers {
 		return c.Redirect("/setup")
 	}
-	return c.Render("views/login", fiber.Map{
+	return c.Render("views/login", s.templateData(c, fiber.Map{
 		"OIDCEnabled": s.auth.OIDCEnabled(),
-	}, "views/layouts/main")
+	}), "views/layouts/main")
 }
 
 func (s *Server) handleLogin(c *fiber.Ctx) error {
@@ -287,6 +298,9 @@ func (s *Server) handleLogin(c *fiber.Ctx) error {
 		}, "views/layouts/main")
 	}
 
+	if u.TotpEnabled {
+		return s.startSecondFactor(c, u)
+	}
 	return s.createSessionAndRedirect(c, u)
 }
 
@@ -371,6 +385,7 @@ func (s *Server) handleOIDCCallback(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusForbidden, "Access denied — no account or invite found for this email")
 	}
 
+	// No second factor here: the identity provider is responsible for MFA.
 	return s.createSessionAndRedirect(c, u)
 }
 

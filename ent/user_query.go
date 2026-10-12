@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"math"
 	"perimeter/ent/invite"
+	"perimeter/ent/loginchallenge"
 	"perimeter/ent/predicate"
+	"perimeter/ent/recoverycode"
 	"perimeter/ent/session"
 	"perimeter/ent/target"
 	"perimeter/ent/user"
@@ -22,13 +24,15 @@ import (
 // UserQuery is the builder for querying User entities.
 type UserQuery struct {
 	config
-	ctx          *QueryContext
-	order        []user.OrderOption
-	inters       []Interceptor
-	predicates   []predicate.User
-	withTargets  *TargetQuery
-	withSessions *SessionQuery
-	withInvites  *InviteQuery
+	ctx                 *QueryContext
+	order               []user.OrderOption
+	inters              []Interceptor
+	predicates          []predicate.User
+	withTargets         *TargetQuery
+	withSessions        *SessionQuery
+	withInvites         *InviteQuery
+	withRecoveryCodes   *RecoveryCodeQuery
+	withLoginChallenges *LoginChallengeQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -124,6 +128,50 @@ func (_q *UserQuery) QueryInvites() *InviteQuery {
 			sqlgraph.From(user.Table, user.FieldID, selector),
 			sqlgraph.To(invite.Table, invite.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, user.InvitesTable, user.InvitesColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryRecoveryCodes chains the current query on the "recovery_codes" edge.
+func (_q *UserQuery) QueryRecoveryCodes() *RecoveryCodeQuery {
+	query := (&RecoveryCodeClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(user.Table, user.FieldID, selector),
+			sqlgraph.To(recoverycode.Table, recoverycode.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, user.RecoveryCodesTable, user.RecoveryCodesColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryLoginChallenges chains the current query on the "login_challenges" edge.
+func (_q *UserQuery) QueryLoginChallenges() *LoginChallengeQuery {
+	query := (&LoginChallengeClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(user.Table, user.FieldID, selector),
+			sqlgraph.To(loginchallenge.Table, loginchallenge.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, user.LoginChallengesTable, user.LoginChallengesColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -318,14 +366,16 @@ func (_q *UserQuery) Clone() *UserQuery {
 		return nil
 	}
 	return &UserQuery{
-		config:       _q.config,
-		ctx:          _q.ctx.Clone(),
-		order:        append([]user.OrderOption{}, _q.order...),
-		inters:       append([]Interceptor{}, _q.inters...),
-		predicates:   append([]predicate.User{}, _q.predicates...),
-		withTargets:  _q.withTargets.Clone(),
-		withSessions: _q.withSessions.Clone(),
-		withInvites:  _q.withInvites.Clone(),
+		config:              _q.config,
+		ctx:                 _q.ctx.Clone(),
+		order:               append([]user.OrderOption{}, _q.order...),
+		inters:              append([]Interceptor{}, _q.inters...),
+		predicates:          append([]predicate.User{}, _q.predicates...),
+		withTargets:         _q.withTargets.Clone(),
+		withSessions:        _q.withSessions.Clone(),
+		withInvites:         _q.withInvites.Clone(),
+		withRecoveryCodes:   _q.withRecoveryCodes.Clone(),
+		withLoginChallenges: _q.withLoginChallenges.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -362,6 +412,28 @@ func (_q *UserQuery) WithInvites(opts ...func(*InviteQuery)) *UserQuery {
 		opt(query)
 	}
 	_q.withInvites = query
+	return _q
+}
+
+// WithRecoveryCodes tells the query-builder to eager-load the nodes that are connected to
+// the "recovery_codes" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *UserQuery) WithRecoveryCodes(opts ...func(*RecoveryCodeQuery)) *UserQuery {
+	query := (&RecoveryCodeClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withRecoveryCodes = query
+	return _q
+}
+
+// WithLoginChallenges tells the query-builder to eager-load the nodes that are connected to
+// the "login_challenges" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *UserQuery) WithLoginChallenges(opts ...func(*LoginChallengeQuery)) *UserQuery {
+	query := (&LoginChallengeClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withLoginChallenges = query
 	return _q
 }
 
@@ -443,10 +515,12 @@ func (_q *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 	var (
 		nodes       = []*User{}
 		_spec       = _q.querySpec()
-		loadedTypes = [3]bool{
+		loadedTypes = [5]bool{
 			_q.withTargets != nil,
 			_q.withSessions != nil,
 			_q.withInvites != nil,
+			_q.withRecoveryCodes != nil,
+			_q.withLoginChallenges != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -485,6 +559,20 @@ func (_q *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 		if err := _q.loadInvites(ctx, query, nodes,
 			func(n *User) { n.Edges.Invites = []*Invite{} },
 			func(n *User, e *Invite) { n.Edges.Invites = append(n.Edges.Invites, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withRecoveryCodes; query != nil {
+		if err := _q.loadRecoveryCodes(ctx, query, nodes,
+			func(n *User) { n.Edges.RecoveryCodes = []*RecoveryCode{} },
+			func(n *User, e *RecoveryCode) { n.Edges.RecoveryCodes = append(n.Edges.RecoveryCodes, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withLoginChallenges; query != nil {
+		if err := _q.loadLoginChallenges(ctx, query, nodes,
+			func(n *User) { n.Edges.LoginChallenges = []*LoginChallenge{} },
+			func(n *User, e *LoginChallenge) { n.Edges.LoginChallenges = append(n.Edges.LoginChallenges, e) }); err != nil {
 			return nil, err
 		}
 	}
@@ -579,6 +667,68 @@ func (_q *UserQuery) loadInvites(ctx context.Context, query *InviteQuery, nodes 
 		node, ok := nodeids[*fk]
 		if !ok {
 			return fmt.Errorf(`unexpected referenced foreign-key "user_invites" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *UserQuery) loadRecoveryCodes(ctx context.Context, query *RecoveryCodeQuery, nodes []*User, init func(*User), assign func(*User, *RecoveryCode)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*User)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	query.withFKs = true
+	query.Where(predicate.RecoveryCode(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(user.RecoveryCodesColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.user_recovery_codes
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "user_recovery_codes" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "user_recovery_codes" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *UserQuery) loadLoginChallenges(ctx context.Context, query *LoginChallengeQuery, nodes []*User, init func(*User), assign func(*User, *LoginChallenge)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*User)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	query.withFKs = true
+	query.Where(predicate.LoginChallenge(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(user.LoginChallengesColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.user_login_challenges
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "user_login_challenges" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "user_login_challenges" returned %v for node %v`, *fk, n.ID)
 		}
 		assign(node, n)
 	}

@@ -5,6 +5,9 @@
 {{if .Error}}
 <div class="alert alert-error">{{.Error}}</div>
 {{end}}
+{{with .Flash}}
+<div class="alert alert-error" role="alert">{{.Message}}</div>
+{{end}}
 
 <form action="/login" method="POST">
   <div class="form-group">

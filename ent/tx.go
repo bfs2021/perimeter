@@ -24,12 +24,16 @@ type Tx struct {
 	Invite *InviteClient
 	// Job is the client for interacting with the Job builders.
 	Job *JobClient
+	// LoginChallenge is the client for interacting with the LoginChallenge builders.
+	LoginChallenge *LoginChallengeClient
 	// NotifierConfig is the client for interacting with the NotifierConfig builders.
 	NotifierConfig *NotifierConfigClient
 	// Port is the client for interacting with the Port builders.
 	Port *PortClient
 	// PortScan is the client for interacting with the PortScan builders.
 	PortScan *PortScanClient
+	// RecoveryCode is the client for interacting with the RecoveryCode builders.
+	RecoveryCode *RecoveryCodeClient
 	// SSLScan is the client for interacting with the SSLScan builders.
 	SSLScan *SSLScanClient
 	// Session is the client for interacting with the Session builders.
@@ -177,9 +181,11 @@ func (tx *Tx) init() {
 	tx.ImporterConfig = NewImporterConfigClient(tx.config)
 	tx.Invite = NewInviteClient(tx.config)
 	tx.Job = NewJobClient(tx.config)
+	tx.LoginChallenge = NewLoginChallengeClient(tx.config)
 	tx.NotifierConfig = NewNotifierConfigClient(tx.config)
 	tx.Port = NewPortClient(tx.config)
 	tx.PortScan = NewPortScanClient(tx.config)
+	tx.RecoveryCode = NewRecoveryCodeClient(tx.config)
 	tx.SSLScan = NewSSLScanClient(tx.config)
 	tx.Session = NewSessionClient(tx.config)
 	tx.Tag = NewTagClient(tx.config)

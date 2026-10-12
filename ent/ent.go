@@ -12,9 +12,11 @@ import (
 	"perimeter/ent/invite"
 	"perimeter/ent/ip"
 	"perimeter/ent/job"
+	"perimeter/ent/loginchallenge"
 	"perimeter/ent/notifierconfig"
 	"perimeter/ent/port"
 	"perimeter/ent/portscan"
+	"perimeter/ent/recoverycode"
 	"perimeter/ent/session"
 	"perimeter/ent/sslscan"
 	"perimeter/ent/tag"
@@ -92,9 +94,11 @@ func checkColumn(t, c string) error {
 			importerconfig.Table: importerconfig.ValidColumn,
 			invite.Table:         invite.ValidColumn,
 			job.Table:            job.ValidColumn,
+			loginchallenge.Table: loginchallenge.ValidColumn,
 			notifierconfig.Table: notifierconfig.ValidColumn,
 			port.Table:           port.ValidColumn,
 			portscan.Table:       portscan.ValidColumn,
+			recoverycode.Table:   recoverycode.ValidColumn,
 			sslscan.Table:        sslscan.ValidColumn,
 			session.Table:        session.ValidColumn,
 			tag.Table:            tag.ValidColumn,

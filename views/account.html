@@ -1,0 +1,49 @@
+{{template "views/partials/header" .}}
+
+<h1>Account</h1>
+
+<table>
+  <tbody>
+    <tr><th>Name</th><td>{{.User.Name}}</td></tr>
+    <tr><th>Email</th><td>{{.User.Email}}</td></tr>
+    <tr><th>Role</th><td>{{.User.Role.String}}</td></tr>
+  </tbody>
+</table>
+
+<h2>Two-factor authentication</h2>
+
+{{if .SSOOnly}}
+<p class="text-muted">Your account signs in through single sign-on; two-factor is handled by your identity provider.</p>
+{{else if not .User.TotpEnabled}}
+<p class="text-muted" style="margin-bottom: 12px;">Require a code from an authenticator app in addition to your password.</p>
+<form action="/account/2fa/setup" method="POST">
+  <button type="submit" class="btn-primary">Set up two-factor authentication</button>
+</form>
+{{else}}
+<p style="margin-bottom: 16px;">
+  <span class="badge badge-green">Enabled</span>
+  <span class="text-muted">{{.RecoveryLeft}} of 10 recovery codes left</span>
+</p>
+
+<h3>Regenerate recovery codes</h3>
+<form action="/account/2fa/recovery" method="POST" style="margin-bottom: 24px;">
+  <div class="form-group">
+    <label for="recovery-code">Authenticator or recovery code</label>
+    <input type="text" name="code" id="recovery-code" required autocomplete="one-time-code" style="width: 240px;">
+  </div>
+  <button type="submit">Regenerate recovery codes</button>
+</form>
+
+<h3>Disable two-factor</h3>
+<form action="/account/2fa/disable" method="POST">
+  <div class="form-group">
+    <label for="disable-password">Password</label>
+    <input type="password" name="password" id="disable-password" required style="width: 240px;">
+  </div>
+  <div class="form-group">
+    <label for="disable-code">Authenticator or recovery code</label>
+    <input type="text" name="code" id="disable-code" required autocomplete="one-time-code" style="width: 240px;">
+  </div>
+  <button type="submit" class="btn-danger">Disable two-factor</button>
+</form>
+{{end}}
