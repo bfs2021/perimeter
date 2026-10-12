@@ -9,7 +9,25 @@
   <button type="button" id="copy-token">Copy</button>
 </div>
 
-<div id="token-snippets"></div>
+<div id="token-snippets">
+  <h2>Call the API</h2>
+  <pre class="mono" style="background: #fff; border: 1px solid #e5e5e5; border-radius: 6px; padding: 16px; margin-bottom: 16px; white-space: pre-wrap; word-break: break-all;">curl -H "Authorization: Bearer {{.Token}}" {{.BaseURL}}/api/v1/summary</pre>
+
+  <h2>Claude Code</h2>
+  <pre class="mono" style="background: #fff; border: 1px solid #e5e5e5; border-radius: 6px; padding: 16px; margin-bottom: 16px; white-space: pre-wrap; word-break: break-all;">claude mcp add --transport http perimeter {{.BaseURL}}/mcp --header "Authorization: Bearer {{.Token}}"</pre>
+
+  <h2>Claude Desktop</h2>
+  <p>Add this to <code>claude_desktop_config.json</code>. It needs Node.js for <code>npx</code>.</p>
+  <pre class="mono" style="background: #fff; border: 1px solid #e5e5e5; border-radius: 6px; padding: 16px; margin-bottom: 24px; white-space: pre-wrap; word-break: break-all;">{
+  "mcpServers": {
+    "perimeter": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "{{.BaseURL}}/mcp", "--header", "Authorization:${PERIMETER_AUTH}"],
+      "env": {"PERIMETER_AUTH": "Bearer {{.Token}}"}
+    }
+  }
+}</pre>
+</div>
 
 <a href="/account" class="btn">Done</a>
 

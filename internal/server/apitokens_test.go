@@ -1,6 +1,7 @@
 package server
 
 import (
+	"html"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -97,6 +98,37 @@ func TestAPITokenCreateShowsTokenOnceAndStoresOnlyHash(t *testing.T) {
 		&http.Cookie{Name: auth.SessionCookie, Value: member})
 	if strings.Contains(account.Body, raw) {
 		t.Error("raw token appears on the account page after creation")
+	}
+}
+
+func TestAPITokenCreatePageShowsClientSnippets(t *testing.T) {
+	srv, _, tokens := roleServer(t)
+	resp := postForm(t, srv, tokens[user.RoleMember], "/account/tokens", createTokenForm("laptop", "read", "90d"))
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("create: status %d, want 200", resp.StatusCode)
+	}
+	raw := rawTokenPattern.FindString(resp.Body)
+	if raw == "" {
+		t.Fatal("created page does not show the token")
+	}
+
+	// html/template escapes the quotes in the snippets, so compare the text
+	// after the snippets block. The base URL is the test request's host.
+	page := html.UnescapeString(resp.Body)
+	at := strings.Index(page, `id="token-snippets"`)
+	if at < 0 {
+		t.Fatal("created page has no token-snippets block")
+	}
+	snippets := page[at:]
+	for _, want := range []string{
+		`claude mcp add --transport http perimeter http://example.com/mcp --header "Authorization: Bearer ` + raw + `"`,
+		`curl -H "Authorization: Bearer ` + raw + `" http://example.com/api/v1/summary`,
+		`"args": ["-y", "mcp-remote", "http://example.com/mcp", "--header", "Authorization:${PERIMETER_AUTH}"]`,
+		`"PERIMETER_AUTH": "Bearer ` + raw + `"`,
+	} {
+		if !strings.Contains(snippets, want) {
+			t.Errorf("snippets do not contain %q", want)
+		}
 	}
 }
 

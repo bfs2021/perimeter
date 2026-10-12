@@ -101,11 +101,13 @@ func (s *Server) handleCreateAPIToken(c *fiber.Ctx) error {
 
 	s.auditUI(c, "token.create", tok.Prefix, tok.Name+", "+tok.Scope.String())
 
-	// The raw token is shown once, so the page must not be cached.
+	// The raw token is shown once, so the page must not be cached. The snippets
+	// use the host the request came in on; there is no configured public URL.
 	c.Set(fiber.HeaderCacheControl, "no-store")
 	return c.Render("views/account_token", s.templateData(c, fiber.Map{
 		"Token":     raw,
 		"TokenName": tok.Name,
+		"BaseURL":   c.BaseURL(),
 	}), "views/layouts/main")
 }
 
