@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"perimeter/ent/invite"
+	"perimeter/ent/loginchallenge"
 	"perimeter/ent/predicate"
+	"perimeter/ent/recoverycode"
 	"perimeter/ent/session"
 	"perimeter/ent/target"
 	"perimeter/ent/user"
@@ -133,6 +135,102 @@ func (_u *UserUpdate) ClearLastLoginAt() *UserUpdate {
 	return _u
 }
 
+// SetTotpSecret sets the "totp_secret" field.
+func (_u *UserUpdate) SetTotpSecret(v string) *UserUpdate {
+	_u.mutation.SetTotpSecret(v)
+	return _u
+}
+
+// SetNillableTotpSecret sets the "totp_secret" field if the given value is not nil.
+func (_u *UserUpdate) SetNillableTotpSecret(v *string) *UserUpdate {
+	if v != nil {
+		_u.SetTotpSecret(*v)
+	}
+	return _u
+}
+
+// ClearTotpSecret clears the value of the "totp_secret" field.
+func (_u *UserUpdate) ClearTotpSecret() *UserUpdate {
+	_u.mutation.ClearTotpSecret()
+	return _u
+}
+
+// SetTotpEnabled sets the "totp_enabled" field.
+func (_u *UserUpdate) SetTotpEnabled(v bool) *UserUpdate {
+	_u.mutation.SetTotpEnabled(v)
+	return _u
+}
+
+// SetNillableTotpEnabled sets the "totp_enabled" field if the given value is not nil.
+func (_u *UserUpdate) SetNillableTotpEnabled(v *bool) *UserUpdate {
+	if v != nil {
+		_u.SetTotpEnabled(*v)
+	}
+	return _u
+}
+
+// SetTotpLastStep sets the "totp_last_step" field.
+func (_u *UserUpdate) SetTotpLastStep(v int64) *UserUpdate {
+	_u.mutation.ResetTotpLastStep()
+	_u.mutation.SetTotpLastStep(v)
+	return _u
+}
+
+// SetNillableTotpLastStep sets the "totp_last_step" field if the given value is not nil.
+func (_u *UserUpdate) SetNillableTotpLastStep(v *int64) *UserUpdate {
+	if v != nil {
+		_u.SetTotpLastStep(*v)
+	}
+	return _u
+}
+
+// AddTotpLastStep adds value to the "totp_last_step" field.
+func (_u *UserUpdate) AddTotpLastStep(v int64) *UserUpdate {
+	_u.mutation.AddTotpLastStep(v)
+	return _u
+}
+
+// SetTotpFailures sets the "totp_failures" field.
+func (_u *UserUpdate) SetTotpFailures(v int) *UserUpdate {
+	_u.mutation.ResetTotpFailures()
+	_u.mutation.SetTotpFailures(v)
+	return _u
+}
+
+// SetNillableTotpFailures sets the "totp_failures" field if the given value is not nil.
+func (_u *UserUpdate) SetNillableTotpFailures(v *int) *UserUpdate {
+	if v != nil {
+		_u.SetTotpFailures(*v)
+	}
+	return _u
+}
+
+// AddTotpFailures adds value to the "totp_failures" field.
+func (_u *UserUpdate) AddTotpFailures(v int) *UserUpdate {
+	_u.mutation.AddTotpFailures(v)
+	return _u
+}
+
+// SetTotpLockedUntil sets the "totp_locked_until" field.
+func (_u *UserUpdate) SetTotpLockedUntil(v time.Time) *UserUpdate {
+	_u.mutation.SetTotpLockedUntil(v)
+	return _u
+}
+
+// SetNillableTotpLockedUntil sets the "totp_locked_until" field if the given value is not nil.
+func (_u *UserUpdate) SetNillableTotpLockedUntil(v *time.Time) *UserUpdate {
+	if v != nil {
+		_u.SetTotpLockedUntil(*v)
+	}
+	return _u
+}
+
+// ClearTotpLockedUntil clears the value of the "totp_locked_until" field.
+func (_u *UserUpdate) ClearTotpLockedUntil() *UserUpdate {
+	_u.mutation.ClearTotpLockedUntil()
+	return _u
+}
+
 // AddTargetIDs adds the "targets" edge to the Target entity by IDs.
 func (_u *UserUpdate) AddTargetIDs(ids ...int) *UserUpdate {
 	_u.mutation.AddTargetIDs(ids...)
@@ -176,6 +274,36 @@ func (_u *UserUpdate) AddInvites(v ...*Invite) *UserUpdate {
 		ids[i] = v[i].ID
 	}
 	return _u.AddInviteIDs(ids...)
+}
+
+// AddRecoveryCodeIDs adds the "recovery_codes" edge to the RecoveryCode entity by IDs.
+func (_u *UserUpdate) AddRecoveryCodeIDs(ids ...int) *UserUpdate {
+	_u.mutation.AddRecoveryCodeIDs(ids...)
+	return _u
+}
+
+// AddRecoveryCodes adds the "recovery_codes" edges to the RecoveryCode entity.
+func (_u *UserUpdate) AddRecoveryCodes(v ...*RecoveryCode) *UserUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddRecoveryCodeIDs(ids...)
+}
+
+// AddLoginChallengeIDs adds the "login_challenges" edge to the LoginChallenge entity by IDs.
+func (_u *UserUpdate) AddLoginChallengeIDs(ids ...int) *UserUpdate {
+	_u.mutation.AddLoginChallengeIDs(ids...)
+	return _u
+}
+
+// AddLoginChallenges adds the "login_challenges" edges to the LoginChallenge entity.
+func (_u *UserUpdate) AddLoginChallenges(v ...*LoginChallenge) *UserUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddLoginChallengeIDs(ids...)
 }
 
 // Mutation returns the UserMutation object of the builder.
@@ -244,6 +372,48 @@ func (_u *UserUpdate) RemoveInvites(v ...*Invite) *UserUpdate {
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveInviteIDs(ids...)
+}
+
+// ClearRecoveryCodes clears all "recovery_codes" edges to the RecoveryCode entity.
+func (_u *UserUpdate) ClearRecoveryCodes() *UserUpdate {
+	_u.mutation.ClearRecoveryCodes()
+	return _u
+}
+
+// RemoveRecoveryCodeIDs removes the "recovery_codes" edge to RecoveryCode entities by IDs.
+func (_u *UserUpdate) RemoveRecoveryCodeIDs(ids ...int) *UserUpdate {
+	_u.mutation.RemoveRecoveryCodeIDs(ids...)
+	return _u
+}
+
+// RemoveRecoveryCodes removes "recovery_codes" edges to RecoveryCode entities.
+func (_u *UserUpdate) RemoveRecoveryCodes(v ...*RecoveryCode) *UserUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveRecoveryCodeIDs(ids...)
+}
+
+// ClearLoginChallenges clears all "login_challenges" edges to the LoginChallenge entity.
+func (_u *UserUpdate) ClearLoginChallenges() *UserUpdate {
+	_u.mutation.ClearLoginChallenges()
+	return _u
+}
+
+// RemoveLoginChallengeIDs removes the "login_challenges" edge to LoginChallenge entities by IDs.
+func (_u *UserUpdate) RemoveLoginChallengeIDs(ids ...int) *UserUpdate {
+	_u.mutation.RemoveLoginChallengeIDs(ids...)
+	return _u
+}
+
+// RemoveLoginChallenges removes "login_challenges" edges to LoginChallenge entities.
+func (_u *UserUpdate) RemoveLoginChallenges(v ...*LoginChallenge) *UserUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveLoginChallengeIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -335,6 +505,33 @@ func (_u *UserUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.LastLoginAtCleared() {
 		_spec.ClearField(user.FieldLastLoginAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.TotpSecret(); ok {
+		_spec.SetField(user.FieldTotpSecret, field.TypeString, value)
+	}
+	if _u.mutation.TotpSecretCleared() {
+		_spec.ClearField(user.FieldTotpSecret, field.TypeString)
+	}
+	if value, ok := _u.mutation.TotpEnabled(); ok {
+		_spec.SetField(user.FieldTotpEnabled, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.TotpLastStep(); ok {
+		_spec.SetField(user.FieldTotpLastStep, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedTotpLastStep(); ok {
+		_spec.AddField(user.FieldTotpLastStep, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.TotpFailures(); ok {
+		_spec.SetField(user.FieldTotpFailures, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedTotpFailures(); ok {
+		_spec.AddField(user.FieldTotpFailures, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.TotpLockedUntil(); ok {
+		_spec.SetField(user.FieldTotpLockedUntil, field.TypeTime, value)
+	}
+	if _u.mutation.TotpLockedUntilCleared() {
+		_spec.ClearField(user.FieldTotpLockedUntil, field.TypeTime)
 	}
 	if _u.mutation.TargetsCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -464,6 +661,96 @@ func (_u *UserUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(invite.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.RecoveryCodesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.RecoveryCodesTable,
+			Columns: []string{user.RecoveryCodesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(recoverycode.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedRecoveryCodesIDs(); len(nodes) > 0 && !_u.mutation.RecoveryCodesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.RecoveryCodesTable,
+			Columns: []string{user.RecoveryCodesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(recoverycode.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RecoveryCodesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.RecoveryCodesTable,
+			Columns: []string{user.RecoveryCodesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(recoverycode.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.LoginChallengesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.LoginChallengesTable,
+			Columns: []string{user.LoginChallengesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(loginchallenge.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedLoginChallengesIDs(); len(nodes) > 0 && !_u.mutation.LoginChallengesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.LoginChallengesTable,
+			Columns: []string{user.LoginChallengesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(loginchallenge.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.LoginChallengesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.LoginChallengesTable,
+			Columns: []string{user.LoginChallengesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(loginchallenge.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -593,6 +880,102 @@ func (_u *UserUpdateOne) ClearLastLoginAt() *UserUpdateOne {
 	return _u
 }
 
+// SetTotpSecret sets the "totp_secret" field.
+func (_u *UserUpdateOne) SetTotpSecret(v string) *UserUpdateOne {
+	_u.mutation.SetTotpSecret(v)
+	return _u
+}
+
+// SetNillableTotpSecret sets the "totp_secret" field if the given value is not nil.
+func (_u *UserUpdateOne) SetNillableTotpSecret(v *string) *UserUpdateOne {
+	if v != nil {
+		_u.SetTotpSecret(*v)
+	}
+	return _u
+}
+
+// ClearTotpSecret clears the value of the "totp_secret" field.
+func (_u *UserUpdateOne) ClearTotpSecret() *UserUpdateOne {
+	_u.mutation.ClearTotpSecret()
+	return _u
+}
+
+// SetTotpEnabled sets the "totp_enabled" field.
+func (_u *UserUpdateOne) SetTotpEnabled(v bool) *UserUpdateOne {
+	_u.mutation.SetTotpEnabled(v)
+	return _u
+}
+
+// SetNillableTotpEnabled sets the "totp_enabled" field if the given value is not nil.
+func (_u *UserUpdateOne) SetNillableTotpEnabled(v *bool) *UserUpdateOne {
+	if v != nil {
+		_u.SetTotpEnabled(*v)
+	}
+	return _u
+}
+
+// SetTotpLastStep sets the "totp_last_step" field.
+func (_u *UserUpdateOne) SetTotpLastStep(v int64) *UserUpdateOne {
+	_u.mutation.ResetTotpLastStep()
+	_u.mutation.SetTotpLastStep(v)
+	return _u
+}
+
+// SetNillableTotpLastStep sets the "totp_last_step" field if the given value is not nil.
+func (_u *UserUpdateOne) SetNillableTotpLastStep(v *int64) *UserUpdateOne {
+	if v != nil {
+		_u.SetTotpLastStep(*v)
+	}
+	return _u
+}
+
+// AddTotpLastStep adds value to the "totp_last_step" field.
+func (_u *UserUpdateOne) AddTotpLastStep(v int64) *UserUpdateOne {
+	_u.mutation.AddTotpLastStep(v)
+	return _u
+}
+
+// SetTotpFailures sets the "totp_failures" field.
+func (_u *UserUpdateOne) SetTotpFailures(v int) *UserUpdateOne {
+	_u.mutation.ResetTotpFailures()
+	_u.mutation.SetTotpFailures(v)
+	return _u
+}
+
+// SetNillableTotpFailures sets the "totp_failures" field if the given value is not nil.
+func (_u *UserUpdateOne) SetNillableTotpFailures(v *int) *UserUpdateOne {
+	if v != nil {
+		_u.SetTotpFailures(*v)
+	}
+	return _u
+}
+
+// AddTotpFailures adds value to the "totp_failures" field.
+func (_u *UserUpdateOne) AddTotpFailures(v int) *UserUpdateOne {
+	_u.mutation.AddTotpFailures(v)
+	return _u
+}
+
+// SetTotpLockedUntil sets the "totp_locked_until" field.
+func (_u *UserUpdateOne) SetTotpLockedUntil(v time.Time) *UserUpdateOne {
+	_u.mutation.SetTotpLockedUntil(v)
+	return _u
+}
+
+// SetNillableTotpLockedUntil sets the "totp_locked_until" field if the given value is not nil.
+func (_u *UserUpdateOne) SetNillableTotpLockedUntil(v *time.Time) *UserUpdateOne {
+	if v != nil {
+		_u.SetTotpLockedUntil(*v)
+	}
+	return _u
+}
+
+// ClearTotpLockedUntil clears the value of the "totp_locked_until" field.
+func (_u *UserUpdateOne) ClearTotpLockedUntil() *UserUpdateOne {
+	_u.mutation.ClearTotpLockedUntil()
+	return _u
+}
+
 // AddTargetIDs adds the "targets" edge to the Target entity by IDs.
 func (_u *UserUpdateOne) AddTargetIDs(ids ...int) *UserUpdateOne {
 	_u.mutation.AddTargetIDs(ids...)
@@ -636,6 +1019,36 @@ func (_u *UserUpdateOne) AddInvites(v ...*Invite) *UserUpdateOne {
 		ids[i] = v[i].ID
 	}
 	return _u.AddInviteIDs(ids...)
+}
+
+// AddRecoveryCodeIDs adds the "recovery_codes" edge to the RecoveryCode entity by IDs.
+func (_u *UserUpdateOne) AddRecoveryCodeIDs(ids ...int) *UserUpdateOne {
+	_u.mutation.AddRecoveryCodeIDs(ids...)
+	return _u
+}
+
+// AddRecoveryCodes adds the "recovery_codes" edges to the RecoveryCode entity.
+func (_u *UserUpdateOne) AddRecoveryCodes(v ...*RecoveryCode) *UserUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddRecoveryCodeIDs(ids...)
+}
+
+// AddLoginChallengeIDs adds the "login_challenges" edge to the LoginChallenge entity by IDs.
+func (_u *UserUpdateOne) AddLoginChallengeIDs(ids ...int) *UserUpdateOne {
+	_u.mutation.AddLoginChallengeIDs(ids...)
+	return _u
+}
+
+// AddLoginChallenges adds the "login_challenges" edges to the LoginChallenge entity.
+func (_u *UserUpdateOne) AddLoginChallenges(v ...*LoginChallenge) *UserUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddLoginChallengeIDs(ids...)
 }
 
 // Mutation returns the UserMutation object of the builder.
@@ -704,6 +1117,48 @@ func (_u *UserUpdateOne) RemoveInvites(v ...*Invite) *UserUpdateOne {
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveInviteIDs(ids...)
+}
+
+// ClearRecoveryCodes clears all "recovery_codes" edges to the RecoveryCode entity.
+func (_u *UserUpdateOne) ClearRecoveryCodes() *UserUpdateOne {
+	_u.mutation.ClearRecoveryCodes()
+	return _u
+}
+
+// RemoveRecoveryCodeIDs removes the "recovery_codes" edge to RecoveryCode entities by IDs.
+func (_u *UserUpdateOne) RemoveRecoveryCodeIDs(ids ...int) *UserUpdateOne {
+	_u.mutation.RemoveRecoveryCodeIDs(ids...)
+	return _u
+}
+
+// RemoveRecoveryCodes removes "recovery_codes" edges to RecoveryCode entities.
+func (_u *UserUpdateOne) RemoveRecoveryCodes(v ...*RecoveryCode) *UserUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveRecoveryCodeIDs(ids...)
+}
+
+// ClearLoginChallenges clears all "login_challenges" edges to the LoginChallenge entity.
+func (_u *UserUpdateOne) ClearLoginChallenges() *UserUpdateOne {
+	_u.mutation.ClearLoginChallenges()
+	return _u
+}
+
+// RemoveLoginChallengeIDs removes the "login_challenges" edge to LoginChallenge entities by IDs.
+func (_u *UserUpdateOne) RemoveLoginChallengeIDs(ids ...int) *UserUpdateOne {
+	_u.mutation.RemoveLoginChallengeIDs(ids...)
+	return _u
+}
+
+// RemoveLoginChallenges removes "login_challenges" edges to LoginChallenge entities.
+func (_u *UserUpdateOne) RemoveLoginChallenges(v ...*LoginChallenge) *UserUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveLoginChallengeIDs(ids...)
 }
 
 // Where appends a list predicates to the UserUpdate builder.
@@ -825,6 +1280,33 @@ func (_u *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) {
 	}
 	if _u.mutation.LastLoginAtCleared() {
 		_spec.ClearField(user.FieldLastLoginAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.TotpSecret(); ok {
+		_spec.SetField(user.FieldTotpSecret, field.TypeString, value)
+	}
+	if _u.mutation.TotpSecretCleared() {
+		_spec.ClearField(user.FieldTotpSecret, field.TypeString)
+	}
+	if value, ok := _u.mutation.TotpEnabled(); ok {
+		_spec.SetField(user.FieldTotpEnabled, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.TotpLastStep(); ok {
+		_spec.SetField(user.FieldTotpLastStep, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedTotpLastStep(); ok {
+		_spec.AddField(user.FieldTotpLastStep, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.TotpFailures(); ok {
+		_spec.SetField(user.FieldTotpFailures, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedTotpFailures(); ok {
+		_spec.AddField(user.FieldTotpFailures, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.TotpLockedUntil(); ok {
+		_spec.SetField(user.FieldTotpLockedUntil, field.TypeTime, value)
+	}
+	if _u.mutation.TotpLockedUntilCleared() {
+		_spec.ClearField(user.FieldTotpLockedUntil, field.TypeTime)
 	}
 	if _u.mutation.TargetsCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -954,6 +1436,96 @@ func (_u *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(invite.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.RecoveryCodesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.RecoveryCodesTable,
+			Columns: []string{user.RecoveryCodesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(recoverycode.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedRecoveryCodesIDs(); len(nodes) > 0 && !_u.mutation.RecoveryCodesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.RecoveryCodesTable,
+			Columns: []string{user.RecoveryCodesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(recoverycode.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RecoveryCodesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.RecoveryCodesTable,
+			Columns: []string{user.RecoveryCodesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(recoverycode.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.LoginChallengesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.LoginChallengesTable,
+			Columns: []string{user.LoginChallengesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(loginchallenge.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedLoginChallengesIDs(); len(nodes) > 0 && !_u.mutation.LoginChallengesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.LoginChallengesTable,
+			Columns: []string{user.LoginChallengesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(loginchallenge.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.LoginChallengesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.LoginChallengesTable,
+			Columns: []string{user.LoginChallengesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(loginchallenge.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

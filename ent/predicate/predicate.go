@@ -24,6 +24,9 @@ type Invite func(*sql.Selector)
 // Job is the predicate function for job builders.
 type Job func(*sql.Selector)
 
+// LoginChallenge is the predicate function for loginchallenge builders.
+type LoginChallenge func(*sql.Selector)
+
 // NotifierConfig is the predicate function for notifierconfig builders.
 type NotifierConfig func(*sql.Selector)
 
@@ -32,6 +35,9 @@ type Port func(*sql.Selector)
 
 // PortScan is the predicate function for portscan builders.
 type PortScan func(*sql.Selector)
+
+// RecoveryCode is the predicate function for recoverycode builders.
+type RecoveryCode func(*sql.Selector)
 
 // SSLScan is the predicate function for sslscan builders.
 type SSLScan func(*sql.Selector)

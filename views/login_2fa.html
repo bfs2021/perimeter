@@ -1,0 +1,23 @@
+<div class="container" style="max-width: 400px; margin-top: 80px;">
+
+<h1>Two-factor authentication</h1>
+
+{{with .Flash}}
+<div class="alert alert-error" role="alert">{{.Message}}</div>
+{{end}}
+
+<p class="text-muted" style="margin-bottom: 16px;">Enter the 6-digit code from your authenticator app, or one of your recovery codes.</p>
+
+<form action="/login/2fa" method="POST">
+  <div class="form-group">
+    <label for="code">Code</label>
+    <input type="text" name="code" id="code" required autofocus autocomplete="one-time-code" style="width: 100%;">
+  </div>
+  <button type="submit" class="btn-primary" style="width: 100%;">Verify</button>
+</form>
+
+<div style="text-align: center; margin-top: 20px;">
+  <a href="/login">Cancel</a>
+</div>
+
+</div>

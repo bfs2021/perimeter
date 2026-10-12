@@ -1,0 +1,10 @@
+{{template "views/partials/header" .}}
+
+<h1>Recovery codes</h1>
+
+<p style="margin-bottom: 16px;">Save these codes somewhere safe. Each one works once. They will not be shown again.</p>
+
+<pre class="mono" style="background: #fff; border: 1px solid #e5e5e5; border-radius: 6px; padding: 16px; margin-bottom: 24px;">{{range .Codes}}{{.}}
+{{end}}</pre>
+
+<a href="/account" class="btn">Done</a>

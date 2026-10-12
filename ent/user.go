@@ -33,6 +33,16 @@ type User struct {
 	Role user.Role `json:"role,omitempty"`
 	// LastLoginAt holds the value of the "last_login_at" field.
 	LastLoginAt *time.Time `json:"last_login_at,omitempty"`
+	// TotpSecret holds the value of the "totp_secret" field.
+	TotpSecret string `json:"-"`
+	// TotpEnabled holds the value of the "totp_enabled" field.
+	TotpEnabled bool `json:"totp_enabled,omitempty"`
+	// TotpLastStep holds the value of the "totp_last_step" field.
+	TotpLastStep int64 `json:"totp_last_step,omitempty"`
+	// TotpFailures holds the value of the "totp_failures" field.
+	TotpFailures int `json:"totp_failures,omitempty"`
+	// TotpLockedUntil holds the value of the "totp_locked_until" field.
+	TotpLockedUntil *time.Time `json:"totp_locked_until,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the UserQuery when eager-loading is set.
 	Edges        UserEdges `json:"edges"`
@@ -47,9 +57,13 @@ type UserEdges struct {
 	Sessions []*Session `json:"sessions,omitempty"`
 	// Invites holds the value of the invites edge.
 	Invites []*Invite `json:"invites,omitempty"`
+	// RecoveryCodes holds the value of the recovery_codes edge.
+	RecoveryCodes []*RecoveryCode `json:"recovery_codes,omitempty"`
+	// LoginChallenges holds the value of the login_challenges edge.
+	LoginChallenges []*LoginChallenge `json:"login_challenges,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [3]bool
+	loadedTypes [5]bool
 }
 
 // TargetsOrErr returns the Targets value or an error if the edge
@@ -79,18 +93,36 @@ func (e UserEdges) InvitesOrErr() ([]*Invite, error) {
 	return nil, &NotLoadedError{edge: "invites"}
 }
 
+// RecoveryCodesOrErr returns the RecoveryCodes value or an error if the edge
+// was not loaded in eager-loading.
+func (e UserEdges) RecoveryCodesOrErr() ([]*RecoveryCode, error) {
+	if e.loadedTypes[3] {
+		return e.RecoveryCodes, nil
+	}
+	return nil, &NotLoadedError{edge: "recovery_codes"}
+}
+
+// LoginChallengesOrErr returns the LoginChallenges value or an error if the edge
+// was not loaded in eager-loading.
+func (e UserEdges) LoginChallengesOrErr() ([]*LoginChallenge, error) {
+	if e.loadedTypes[4] {
+		return e.LoginChallenges, nil
+	}
+	return nil, &NotLoadedError{edge: "login_challenges"}
+}
+
 // scanValues returns the types for scanning values from sql.Rows.
 func (*User) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case user.FieldConfirmed:
+		case user.FieldConfirmed, user.FieldTotpEnabled:
 			values[i] = new(sql.NullBool)
-		case user.FieldID:
+		case user.FieldID, user.FieldTotpLastStep, user.FieldTotpFailures:
 			values[i] = new(sql.NullInt64)
-		case user.FieldEmail, user.FieldName, user.FieldPasswordHash, user.FieldRole:
+		case user.FieldEmail, user.FieldName, user.FieldPasswordHash, user.FieldRole, user.FieldTotpSecret:
 			values[i] = new(sql.NullString)
-		case user.FieldCreateTime, user.FieldUpdateTime, user.FieldLastLoginAt:
+		case user.FieldCreateTime, user.FieldUpdateTime, user.FieldLastLoginAt, user.FieldTotpLockedUntil:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -163,6 +195,37 @@ func (_m *User) assignValues(columns []string, values []any) error {
 				_m.LastLoginAt = new(time.Time)
 				*_m.LastLoginAt = value.Time
 			}
+		case user.FieldTotpSecret:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field totp_secret", values[i])
+			} else if value.Valid {
+				_m.TotpSecret = value.String
+			}
+		case user.FieldTotpEnabled:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field totp_enabled", values[i])
+			} else if value.Valid {
+				_m.TotpEnabled = value.Bool
+			}
+		case user.FieldTotpLastStep:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field totp_last_step", values[i])
+			} else if value.Valid {
+				_m.TotpLastStep = value.Int64
+			}
+		case user.FieldTotpFailures:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field totp_failures", values[i])
+			} else if value.Valid {
+				_m.TotpFailures = int(value.Int64)
+			}
+		case user.FieldTotpLockedUntil:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field totp_locked_until", values[i])
+			} else if value.Valid {
+				_m.TotpLockedUntil = new(time.Time)
+				*_m.TotpLockedUntil = value.Time
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -189,6 +252,16 @@ func (_m *User) QuerySessions() *SessionQuery {
 // QueryInvites queries the "invites" edge of the User entity.
 func (_m *User) QueryInvites() *InviteQuery {
 	return NewUserClient(_m.config).QueryInvites(_m)
+}
+
+// QueryRecoveryCodes queries the "recovery_codes" edge of the User entity.
+func (_m *User) QueryRecoveryCodes() *RecoveryCodeQuery {
+	return NewUserClient(_m.config).QueryRecoveryCodes(_m)
+}
+
+// QueryLoginChallenges queries the "login_challenges" edge of the User entity.
+func (_m *User) QueryLoginChallenges() *LoginChallengeQuery {
+	return NewUserClient(_m.config).QueryLoginChallenges(_m)
 }
 
 // Update returns a builder for updating this User.
@@ -239,6 +312,22 @@ func (_m *User) String() string {
 	builder.WriteString(", ")
 	if v := _m.LastLoginAt; v != nil {
 		builder.WriteString("last_login_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	builder.WriteString("totp_secret=<sensitive>")
+	builder.WriteString(", ")
+	builder.WriteString("totp_enabled=")
+	builder.WriteString(fmt.Sprintf("%v", _m.TotpEnabled))
+	builder.WriteString(", ")
+	builder.WriteString("totp_last_step=")
+	builder.WriteString(fmt.Sprintf("%v", _m.TotpLastStep))
+	builder.WriteString(", ")
+	builder.WriteString("totp_failures=")
+	builder.WriteString(fmt.Sprintf("%v", _m.TotpFailures))
+	builder.WriteString(", ")
+	if v := _m.TotpLockedUntil; v != nil {
+		builder.WriteString("totp_locked_until=")
 		builder.WriteString(v.Format(time.ANSIC))
 	}
 	builder.WriteByte(')')

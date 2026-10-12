@@ -13,10 +13,12 @@ import (
 	"perimeter/ent/invite"
 	"perimeter/ent/ip"
 	"perimeter/ent/job"
+	"perimeter/ent/loginchallenge"
 	"perimeter/ent/notifierconfig"
 	"perimeter/ent/port"
 	"perimeter/ent/portscan"
 	"perimeter/ent/predicate"
+	"perimeter/ent/recoverycode"
 	"perimeter/ent/session"
 	"perimeter/ent/sslscan"
 	"perimeter/ent/tag"
@@ -244,6 +246,33 @@ func (f TraverseJob) Traverse(ctx context.Context, q ent.Query) error {
 	return fmt.Errorf("unexpected query type %T. expect *ent.JobQuery", q)
 }
 
+// The LoginChallengeFunc type is an adapter to allow the use of ordinary function as a Querier.
+type LoginChallengeFunc func(context.Context, *ent.LoginChallengeQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f LoginChallengeFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.LoginChallengeQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.LoginChallengeQuery", q)
+}
+
+// The TraverseLoginChallenge type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseLoginChallenge func(context.Context, *ent.LoginChallengeQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseLoginChallenge) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseLoginChallenge) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.LoginChallengeQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.LoginChallengeQuery", q)
+}
+
 // The NotifierConfigFunc type is an adapter to allow the use of ordinary function as a Querier.
 type NotifierConfigFunc func(context.Context, *ent.NotifierConfigQuery) (ent.Value, error)
 
@@ -323,6 +352,33 @@ func (f TraversePortScan) Traverse(ctx context.Context, q ent.Query) error {
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.PortScanQuery", q)
+}
+
+// The RecoveryCodeFunc type is an adapter to allow the use of ordinary function as a Querier.
+type RecoveryCodeFunc func(context.Context, *ent.RecoveryCodeQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f RecoveryCodeFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.RecoveryCodeQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.RecoveryCodeQuery", q)
+}
+
+// The TraverseRecoveryCode type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseRecoveryCode func(context.Context, *ent.RecoveryCodeQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseRecoveryCode) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseRecoveryCode) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.RecoveryCodeQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.RecoveryCodeQuery", q)
 }
 
 // The SSLScanFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -475,12 +531,16 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.InviteQuery, predicate.Invite, invite.OrderOption]{typ: ent.TypeInvite, tq: q}, nil
 	case *ent.JobQuery:
 		return &query[*ent.JobQuery, predicate.Job, job.OrderOption]{typ: ent.TypeJob, tq: q}, nil
+	case *ent.LoginChallengeQuery:
+		return &query[*ent.LoginChallengeQuery, predicate.LoginChallenge, loginchallenge.OrderOption]{typ: ent.TypeLoginChallenge, tq: q}, nil
 	case *ent.NotifierConfigQuery:
 		return &query[*ent.NotifierConfigQuery, predicate.NotifierConfig, notifierconfig.OrderOption]{typ: ent.TypeNotifierConfig, tq: q}, nil
 	case *ent.PortQuery:
 		return &query[*ent.PortQuery, predicate.Port, port.OrderOption]{typ: ent.TypePort, tq: q}, nil
 	case *ent.PortScanQuery:
 		return &query[*ent.PortScanQuery, predicate.PortScan, portscan.OrderOption]{typ: ent.TypePortScan, tq: q}, nil
+	case *ent.RecoveryCodeQuery:
+		return &query[*ent.RecoveryCodeQuery, predicate.RecoveryCode, recoverycode.OrderOption]{typ: ent.TypeRecoveryCode, tq: q}, nil
 	case *ent.SSLScanQuery:
 		return &query[*ent.SSLScanQuery, predicate.SSLScan, sslscan.OrderOption]{typ: ent.TypeSSLScan, tq: q}, nil
 	case *ent.SessionQuery:

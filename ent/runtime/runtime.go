@@ -9,8 +9,10 @@ import (
 	"perimeter/ent/invite"
 	"perimeter/ent/ip"
 	"perimeter/ent/job"
+	"perimeter/ent/loginchallenge"
 	"perimeter/ent/notifierconfig"
 	"perimeter/ent/portscan"
+	"perimeter/ent/recoverycode"
 	"perimeter/ent/schema"
 	"perimeter/ent/session"
 	"perimeter/ent/sslscan"
@@ -120,6 +122,29 @@ func init() {
 	job.DefaultUpdateTime = jobDescUpdateTime.Default.(func() time.Time)
 	// job.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
 	job.UpdateDefaultUpdateTime = jobDescUpdateTime.UpdateDefault.(func() time.Time)
+	loginchallengeMixin := schema.LoginChallenge{}.Mixin()
+	loginchallengeMixinFields0 := loginchallengeMixin[0].Fields()
+	_ = loginchallengeMixinFields0
+	loginchallengeFields := schema.LoginChallenge{}.Fields()
+	_ = loginchallengeFields
+	// loginchallengeDescCreateTime is the schema descriptor for create_time field.
+	loginchallengeDescCreateTime := loginchallengeMixinFields0[0].Descriptor()
+	// loginchallenge.DefaultCreateTime holds the default value on creation for the create_time field.
+	loginchallenge.DefaultCreateTime = loginchallengeDescCreateTime.Default.(func() time.Time)
+	// loginchallengeDescUpdateTime is the schema descriptor for update_time field.
+	loginchallengeDescUpdateTime := loginchallengeMixinFields0[1].Descriptor()
+	// loginchallenge.DefaultUpdateTime holds the default value on creation for the update_time field.
+	loginchallenge.DefaultUpdateTime = loginchallengeDescUpdateTime.Default.(func() time.Time)
+	// loginchallenge.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	loginchallenge.UpdateDefaultUpdateTime = loginchallengeDescUpdateTime.UpdateDefault.(func() time.Time)
+	// loginchallengeDescTokenHash is the schema descriptor for token_hash field.
+	loginchallengeDescTokenHash := loginchallengeFields[0].Descriptor()
+	// loginchallenge.TokenHashValidator is a validator for the "token_hash" field. It is called by the builders before save.
+	loginchallenge.TokenHashValidator = loginchallengeDescTokenHash.Validators[0].(func(string) error)
+	// loginchallengeDescAttempts is the schema descriptor for attempts field.
+	loginchallengeDescAttempts := loginchallengeFields[2].Descriptor()
+	// loginchallenge.DefaultAttempts holds the default value on creation for the attempts field.
+	loginchallenge.DefaultAttempts = loginchallengeDescAttempts.Default.(int)
 	notifierconfigMixin := schema.NotifierConfig{}.Mixin()
 	notifierconfigMixinFields0 := notifierconfigMixin[0].Fields()
 	_ = notifierconfigMixinFields0
@@ -149,6 +174,25 @@ func init() {
 	portscanDescCheckCount := portscanFields[2].Descriptor()
 	// portscan.DefaultCheckCount holds the default value on creation for the check_count field.
 	portscan.DefaultCheckCount = portscanDescCheckCount.Default.(int)
+	recoverycodeMixin := schema.RecoveryCode{}.Mixin()
+	recoverycodeMixinFields0 := recoverycodeMixin[0].Fields()
+	_ = recoverycodeMixinFields0
+	recoverycodeFields := schema.RecoveryCode{}.Fields()
+	_ = recoverycodeFields
+	// recoverycodeDescCreateTime is the schema descriptor for create_time field.
+	recoverycodeDescCreateTime := recoverycodeMixinFields0[0].Descriptor()
+	// recoverycode.DefaultCreateTime holds the default value on creation for the create_time field.
+	recoverycode.DefaultCreateTime = recoverycodeDescCreateTime.Default.(func() time.Time)
+	// recoverycodeDescUpdateTime is the schema descriptor for update_time field.
+	recoverycodeDescUpdateTime := recoverycodeMixinFields0[1].Descriptor()
+	// recoverycode.DefaultUpdateTime holds the default value on creation for the update_time field.
+	recoverycode.DefaultUpdateTime = recoverycodeDescUpdateTime.Default.(func() time.Time)
+	// recoverycode.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	recoverycode.UpdateDefaultUpdateTime = recoverycodeDescUpdateTime.UpdateDefault.(func() time.Time)
+	// recoverycodeDescCodeHash is the schema descriptor for code_hash field.
+	recoverycodeDescCodeHash := recoverycodeFields[0].Descriptor()
+	// recoverycode.CodeHashValidator is a validator for the "code_hash" field. It is called by the builders before save.
+	recoverycode.CodeHashValidator = recoverycodeDescCodeHash.Validators[0].(func(string) error)
 	sslscanFields := schema.SSLScan{}.Fields()
 	_ = sslscanFields
 	// sslscanDescCheckCount is the schema descriptor for check_count field.
@@ -248,6 +292,18 @@ func init() {
 	userDescConfirmed := userFields[3].Descriptor()
 	// user.DefaultConfirmed holds the default value on creation for the confirmed field.
 	user.DefaultConfirmed = userDescConfirmed.Default.(bool)
+	// userDescTotpEnabled is the schema descriptor for totp_enabled field.
+	userDescTotpEnabled := userFields[7].Descriptor()
+	// user.DefaultTotpEnabled holds the default value on creation for the totp_enabled field.
+	user.DefaultTotpEnabled = userDescTotpEnabled.Default.(bool)
+	// userDescTotpLastStep is the schema descriptor for totp_last_step field.
+	userDescTotpLastStep := userFields[8].Descriptor()
+	// user.DefaultTotpLastStep holds the default value on creation for the totp_last_step field.
+	user.DefaultTotpLastStep = userDescTotpLastStep.Default.(int64)
+	// userDescTotpFailures is the schema descriptor for totp_failures field.
+	userDescTotpFailures := userFields[9].Descriptor()
+	// user.DefaultTotpFailures holds the default value on creation for the totp_failures field.
+	user.DefaultTotpFailures = userDescTotpFailures.Default.(int)
 }
 
 const (
